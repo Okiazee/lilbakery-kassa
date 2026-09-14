@@ -1,5 +1,5 @@
 /* Service worker för lil'bakery Kassa: appen fungerar offline när den väl laddats en gång. */
-const VERSION = '2026-09-14.2';
+const VERSION = '2026-09-14.3';
 const SHELL = 'kassa-shell-' + VERSION;
 const FONTS = 'kassa-fonts';
 const ASSETS = [

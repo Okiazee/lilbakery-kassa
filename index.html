@@ -285,6 +285,13 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .art-opt.is-active { border-color: var(--blue-deep); background: var(--mist); color: var(--blue-ink); }
 .art-opt input { display: none; }
 
+.howto { margin-top: 12px; }
+.howto summary { cursor: pointer; font-weight: 800; color: var(--blue-ink); padding: 8px 0; }
+.code { white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, Consolas, 'Courier New', monospace; font-size: 12px; line-height: 1.45; background: var(--mist); padding: 12px 14px; border-radius: 12px; margin: 10px 0 0; max-height: 320px; overflow: auto; }
+.status-line { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; background: var(--mist); font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+.status-line.ok { background: var(--good-bg); color: var(--good); }
+.status-line.warn { background: var(--warn-bg); color: var(--warn); }
+
 /* ---------- Toast ---------- */
 #toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
 .toast { pointer-events: auto; display: flex; gap: 12px; align-items: center; padding: 12px 18px; border-radius: 999px; background: var(--ink); color: #fff; font-weight: 700; box-shadow: var(--shadow); animation: pop .2s ease-out; }
@@ -333,7 +340,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const APP_DATE = '2026-09-14';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -432,7 +439,7 @@ const isTouch = () => navigator.maxTouchPoints > 1;
 
 // ---------- State ----------
 function defaultSettings() {
-  return { foretag: "lil'bakery", orgnr: '', adress: '', swish: '', kvittoText: 'Tack för ditt köp!', momsStandard: 6, pin: '', vaxelkassa: 500 };
+  return { foretag: "lil'bakery", orgnr: '', adress: '', swish: '', kvittoText: 'Tack för ditt köp!', momsStandard: 6, pin: '', vaxelkassa: 500, driveUrl: '', driveKey: '', driveAuto: true };
 }
 function seedState() {
   const cats = [
@@ -702,7 +709,7 @@ function saveClosing() {
   let c = state.closings.find((x) => x.day === day);
   if (!c) { c = { id: uid(), day }; state.closings.push(c); }
   Object.assign(c, { savedAt: new Date().toISOString(), float, counted, expected, diff, note, snapshot: { count: s.count, total: s.total, swish: s.swish, cash: s.cash, vat: s.vat, discounts: s.discounts, voidedCount: s.voidedCount, voidedSum: s.voidedSum } });
-  save(); toast('Dagsavslut sparat'); render();
+  save(); render(); afterClosingSaved(day);
 }
 
 // --- CSV ---
@@ -757,7 +764,7 @@ function moveProduct(id, dir) {
   if (j < 0 || j >= siblings.length) return;
   const a = state.products.indexOf(siblings[i]); const b = state.products.indexOf(siblings[j]);
   [state.products[a], state.products[b]] = [state.products[b], state.products[a]];
-  save(); render();
+  save(); touchBackup(); render();
 }
 function productDialog(id, presetCat) {
   const existing = id ? state.products.find((x) => x.id === id) : null;
@@ -786,12 +793,12 @@ function productDialog(id, presetCat) {
     if (categoryId === '__new') { const cn = $('#p-newcat', el).value.trim(); if (!cn) { toast('Skriv ett namn på kategorin', 'bad'); return; } categoryId = ensureCategory(cn); }
     const data = { name, price: r2(price), vat: Number($('#p-vat', el).value), categoryId, emoji: $('#p-emoji', el).value.trim(), active: $('#p-active', el).checked };
     if (existing) Object.assign(existing, data); else state.products.push({ id: uid(), ...data });
-    state.meta.sample = false; save(); m.close(); toast('Produkt sparad'); render();
+    state.meta.sample = false; save(); touchBackup(); m.close(); toast('Produkt sparad'); render();
   });
   $('[data-del]', el)?.addEventListener('click', async () => {
     m.close();
     if (await confirmDialog({ title: 'Ta bort produkt', text: `Vill du ta bort <b>${esc(existing.name)}</b>? Gamla kvitton påverkas inte.`, ok: 'Ta bort', danger: true })) {
-      state.products = state.products.filter((x) => x.id !== existing.id); state.meta.sample = false; save(); toast('Produkt borttagen'); render();
+      state.products = state.products.filter((x) => x.id !== existing.id); state.meta.sample = false; save(); touchBackup(); toast('Produkt borttagen'); render();
     }
   });
   setTimeout(() => $('#p-name', el).focus(), 50);
@@ -829,13 +836,13 @@ function categoryDialog(id) {
   $('[data-ok]', el).addEventListener('click', () => {
     const name = $('#c-name', el).value.trim(); if (!name) { toast('Skriv ett namn på kategorin', 'bad'); return; }
     if (existing) Object.assign(existing, { name, color, image }); else state.categories.push({ id: uid(), name, color, image });
-    state.meta.sample = false; save(); m.close(); render();
+    state.meta.sample = false; save(); touchBackup(); m.close(); render();
   });
   $('[data-del]', el)?.addEventListener('click', async () => {
     m.close(); const n = state.products.filter((p) => p.categoryId === existing.id).length;
     if (await confirmDialog({ title: 'Ta bort kategori', text: n ? `Kategorin har ${n} produkter. De tas också bort. Gamla kvitton påverkas inte.` : 'Vill du ta bort kategorin?', ok: 'Ta bort', danger: true })) {
       state.products = state.products.filter((p) => p.categoryId !== existing.id); state.categories = state.categories.filter((x) => x.id !== existing.id);
-      if (ui.cat === existing.id) ui.cat = 'all'; state.meta.sample = false; save(); render();
+      if (ui.cat === existing.id) ui.cat = 'all'; state.meta.sample = false; save(); touchBackup(); render();
     }
   });
   setTimeout(() => $('#c-name', el).focus(), 50);
@@ -989,7 +996,7 @@ function importPreview(items) {
       if (existing) { Object.assign(existing, { price: it.price, vat, categoryId }); if (it.emoji) existing.emoji = it.emoji; updated++; }
       else { state.products.push({ id: uid(), name: it.name, price: it.price, vat, categoryId, emoji: it.emoji || '', active: true }); added++; }
     }
-    state.meta.sample = false; save(); m.close(); toast(`${added} nya, ${updated} uppdaterade`); render();
+    state.meta.sample = false; save(); m.close(); touchBackup(); toast(`${added} nya, ${updated} uppdaterade`); render();
   });
 }
 
@@ -997,6 +1004,7 @@ function importPreview(items) {
 function isStandalone() { return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
 function renderInstallningar() {
   const s = state.settings;
+  if (!s.driveKey) { s.driveKey = 'kassa-' + Math.random().toString(36).slice(2, 8); save(); }
   const f = (key, label, opts = {}) => `<label class="field"><span>${label}</span><input class="input ${opts.cls || ''}" data-setting="${key}" value="${esc(s[key])}" ${opts.attrs || ''}></label>`;
   return `<div class="page-head"><h1>Inställningar</h1></div>
   <div class="two-col">
@@ -1028,6 +1036,26 @@ function renderInstallningar() {
         <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
         <div class="btn-row"><button class="btn danger-ghost" data-action="wipe">Radera alla kvitton och dagsavslut</button></div>
       </div>
+      <div class="card"><h2>Google Drive</h2>
+        <p class="fine">Kassan kan skicka en kopia till din Google Drive automatiskt efter varje köp och dagsavslut. Det sker genom ett litet skript i ditt eget Google-konto, så ingen annan får tillgång till uppgifterna.</p>
+        <div id="drive-status" class="status-line ${driveStatus().cls}">${esc(driveStatus().text)}</div>
+        ${f('driveUrl', 'Webbappens adress (slutar på /exec)', { attrs: 'inputmode="url" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"' })}
+        ${f('driveKey', 'Nyckel, samma som i skriptet', { attrs: 'spellcheck="false"' })}
+        <label class="check"><input type="checkbox" data-setting="driveAuto" ${s.driveAuto ? 'checked' : ''}> Kopiera automatiskt efter köp och dagsavslut</label>
+        <div class="btn-row" style="margin-top:10px"><button class="btn" data-action="drive-test">Testa anslutningen</button><button class="btn primary" data-action="drive-now">Kopiera nu</button><button class="btn" data-action="drive-restore">Hämta senaste kopian</button></div>
+        <details class="howto"><summary>Så kopplar du Google Drive, görs en gång på datorn</summary>
+          <ol class="steps">
+            <li>Gå till <b>script.google.com</b> på datorn, inloggad med det Google-konto vars Drive ska användas, och klicka <b>Nytt projekt</b>.</li>
+            <li>Markera all text i kodrutan, ta bort den och klistra in skriptet nedan. Nyckeln är redan ifylld. Spara med Ctrl+S.</li>
+            <li>Klicka <b>Distribuera</b> uppe till höger, sedan <b>Ny distribution</b>. Välj typ <b>Webbapp</b>. Sätt <i>Kör som</i> till <b>Jag</b> och <i>Vem har åtkomst</i> till <b>Alla</b>. Klicka Distribuera.</li>
+            <li>Godkänn åtkomsten: välj ditt konto, klicka <b>Avancerat</b>, sedan <i>Fortsätt till projektet (osäkert)</i> och <b>Tillåt</b>. Varningen visas för att skriptet är ditt eget och inte granskat av Google.</li>
+            <li>Kopiera <b>webbappens webbadress</b>, klistra in den i fältet ovan och tryck <b>Testa anslutningen</b>.</li>
+          </ol>
+          <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV.</p>
+          <div class="btn-row"><button class="btn" data-action="copy-script">Kopiera skriptet</button></div>
+          <pre class="code" id="drive-script">${esc(driveScriptText())}</pre>
+        </details>
+      </div>
       <div class="card"><h2>Installera som app</h2>
         ${isStandalone() ? '<p>Kassan körs som installerad app på den här enheten.</p>' : `<ol class="steps">
           <li><b>iPad och iPhone:</b> öppna sidan i Safari, tryck på Dela-knappen och välj <i>Lägg till på hemskärmen</i>.</li>
@@ -1045,10 +1073,13 @@ function renderInstallningar() {
   </div>`;
 }
 function saveSetting(key, el) {
-  let v = el.value;
+  let v = el.type === 'checkbox' ? el.checked : el.value;
   if (key === 'momsStandard' || key === 'vaxelkassa') v = parseNum(v) ?? 0;
-  else v = v.trim();
+  else if (key === 'driveKey') v = String(v).replace(/[^\w-]/g, '');
+  else if (typeof v === 'string') v = v.trim();
   state.settings[key] = v; save(); toast('Sparat');
+  if (key.startsWith('drive')) { updateDriveStatus(); if (key === 'driveKey') { const pre = $('#drive-script'); if (pre) pre.textContent = driveScriptText(); } }
+  else touchBackup();
 }
 
 // ---------- Modals & dialogs ----------
@@ -1224,7 +1255,7 @@ function paySwish() {
 function finalizeSale(payment, received) {
   const t = cartTotals(); const now = new Date();
   const receipt = { id: uid(), nr: state.nextReceiptNr, ts: now.toISOString(), day: dayKey(now), lines: state.cart.lines.map((l) => ({ ...l })), discount: t.discount, gross: t.gross, total: t.total, vatLines: t.vatLines, payment, received: payment === 'kontant' ? r2(received) : t.total, change: payment === 'kontant' ? r2(received - t.total) : 0, status: 'ok', voided: null };
-  state.nextReceiptNr += 1; state.receipts.push(receipt); state.cart = { lines: [], discount: null }; save();
+  state.nextReceiptNr += 1; state.receipts.push(receipt); state.cart = { lines: [], discount: null }; save(); touchBackup();
   setCartOpen(false); updateCart(); showDone(receipt);
 }
 function showDone(r) {
@@ -1242,7 +1273,108 @@ async function voidReceipt(id) {
   const reason = await textDialog({ title: `Makulera kvitto #${r.nr}`, text: `Kvittot på <b>${kr(r.total)}</b> behålls i listan men räknas inte med i försäljningen. Har kunden fått pengarna tillbaka?`, label: 'Anledning', placeholder: 't.ex. felslag, ångrat köp', ok: 'Makulera', danger: true });
   if (reason === null) return;
   if (!(await requirePin('Makulering kräver PIN'))) return;
-  r.status = 'makulerad'; r.voided = { ts: new Date().toISOString(), reason }; save(); toast(`Kvitto #${r.nr} makulerat`); render();
+  r.status = 'makulerad'; r.voided = { ts: new Date().toISOString(), reason }; save(); touchBackup(); toast(`Kvitto #${r.nr} makulerat`); render();
+}
+
+// ---------- Google Drive via Apps Script ----------
+let driveTimer = null; let driveBusy = false;
+function driveConfigured() { return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec\/?$/.test((state.settings.driveUrl || '').trim()); }
+function backupObject() { return { app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }; }
+function driveScriptText() {
+  return `// lil'bakery Kassa: tar emot säkerhetskopior från kassan och sparar dem på Google Drive.
+const NYCKEL = '${state.settings.driveKey || ''}';   // samma nyckel som i kassans inställningar
+const MAPP = "lil'bakery Kassa";        // mappen skapas i Min enhet på Google Drive
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    if (data.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
+    const mapp = hamtaMapp();
+    const dag = data.day || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const json = JSON.stringify(data.backup);
+    skriv(mapp, 'kassa-backup-senaste.json', json);
+    skriv(mapp, 'kassa-backup-' + dag + '.json', json);
+    if (data.csv) skriv(mapp, 'dagsavslut-' + dag + '.csv', data.csv);
+    return svar({ ok: true, saved: new Date().toISOString() });
+  } catch (fel) { return svar({ ok: false, error: String(fel) }); }
+}
+function doGet(e) {
+  if (!e.parameter || e.parameter.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
+  const filer = hamtaMapp().getFilesByName('kassa-backup-senaste.json');
+  if (!filer.hasNext()) return svar({ ok: false, error: 'Ingen kopia finns' });
+  const fil = filer.next();
+  return svar({ ok: true, updated: fil.getLastUpdated().toISOString(), backup: JSON.parse(fil.getBlob().getDataAsString()) });
+}
+function hamtaMapp() { const it = DriveApp.getFoldersByName(MAPP); return it.hasNext() ? it.next() : DriveApp.createFolder(MAPP); }
+function skriv(mapp, namn, innehall) { const it = mapp.getFilesByName(namn); if (it.hasNext()) it.next().setContent(innehall); else mapp.createFile(namn, innehall, MimeType.PLAIN_TEXT); }
+function svar(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }`;
+}
+function driveStatus() {
+  const m = state.meta;
+  if (!driveConfigured()) return { cls: '', text: 'Inte kopplad ännu. Följ stegen nedan.' };
+  if (driveBusy) return { cls: '', text: 'Kopierar till Google Drive…' };
+  const last = m.driveLastOk ? `Senast kopierad ${m.driveLastOk.slice(0, 10)} ${timeOf(m.driveLastOk)}.` : 'Ingen kopia skickad ännu.';
+  if (m.drivePending && m.driveLastError) return { cls: 'warn', text: `${last} Senaste försöket misslyckades: ${m.driveLastError}` };
+  if (m.drivePending) return { cls: 'warn', text: `${last} Ändringar väntar på att skickas.` };
+  return { cls: m.driveLastOk ? 'ok' : '', text: last };
+}
+function updateDriveStatus() { const el = $('#drive-status'); if (!el) return; const st = driveStatus(); el.className = `status-line ${st.cls}`; el.textContent = st.text; }
+function touchBackup(opts = {}) {
+  if (opts.csvDay) state.meta.driveCsvDay = opts.csvDay;
+  if (!driveConfigured() || !state.settings.driveAuto) return;
+  state.meta.drivePending = true; save(); updateDriveStatus();
+  clearTimeout(driveTimer); driveTimer = setTimeout(() => driveUpload().catch(() => {}), opts.now ? 300 : 12000);
+}
+function friendlyDriveError(e) {
+  const msg = e && e.message ? e.message : String(e);
+  if (/JSON|Unexpected token|Failed to fetch|NetworkError|Load failed/i.test(msg)) return 'Skriptet svarade inte som väntat. Kontrollera adressen och att skriptet är distribuerat som webbapp med åtkomst för Alla.';
+  return msg;
+}
+async function driveUpload(opts = {}) {
+  if (!driveConfigured()) { if (opts.toast) toast('Fyll i webbappens adress under Google Drive först', 'bad'); return false; }
+  if (driveBusy) return false;
+  if (!navigator.onLine) { state.meta.drivePending = true; save(); updateDriveStatus(); if (opts.toast) toast('Ingen uppkoppling. Kopian skickas när nätet är tillbaka.', 'bad'); return false; }
+  driveBusy = true; updateDriveStatus();
+  try {
+    const csvDay = state.meta.driveCsvDay; const hasClosing = csvDay && state.closings.some((c) => c.day === csvDay);
+    const payload = { key: state.settings.driveKey || '', day: csvDay || dayKey(), csv: hasClosing ? closingCsv(csvDay) : null, backup: backupObject() };
+    const res = await fetch(state.settings.driveUrl.trim(), { method: 'POST', body: JSON.stringify(payload) });
+    const json = await res.json();
+    if (!json || !json.ok) throw new Error((json && json.error) || 'Skriptet svarade med fel');
+    state.meta.drivePending = false; state.meta.driveCsvDay = null; state.meta.driveLastOk = new Date().toISOString(); state.meta.driveLastError = '';
+    save(); if (opts.toast) toast('Säkerhetskopia sparad på Google Drive');
+    return true;
+  } catch (e) {
+    state.meta.drivePending = true; state.meta.driveLastError = friendlyDriveError(e); save();
+    if (opts.toast) toast('Kunde inte kopiera till Drive: ' + state.meta.driveLastError, 'bad');
+    return false;
+  } finally { driveBusy = false; updateDriveStatus(); }
+}
+async function driveFetchLatest() {
+  const url = state.settings.driveUrl.trim() + '?key=' + encodeURIComponent(state.settings.driveKey || '') + '&t=' + Date.now();
+  const res = await fetch(url); return res.json();
+}
+async function driveTest() {
+  if (!driveConfigured()) { toast('Klistra in webbappens adress först. Den ska sluta på /exec.', 'bad'); return; }
+  try {
+    const json = await driveFetchLatest();
+    if (json.ok) toast(`Anslutningen fungerar. Senaste kopia på Drive: ${json.updated.slice(0, 10)} ${timeOf(json.updated)}`);
+    else if (json.error === 'Ingen kopia finns') toast('Anslutningen fungerar. Ingen kopia har skickats ännu.');
+    else throw new Error(json.error || 'Skriptet svarade med fel');
+  } catch (e) { toast('Anslutningen misslyckades: ' + friendlyDriveError(e), 'bad'); }
+}
+async function driveRestore() {
+  if (!driveConfigured()) { toast('Klistra in webbappens adress först', 'bad'); return; }
+  try {
+    const json = await driveFetchLatest();
+    if (!json.ok) throw new Error(json.error || 'Skriptet svarade med fel');
+    await applyBackup(json.backup, `Google Drive, kopian är från ${json.updated.slice(0, 10)} ${timeOf(json.updated)}`);
+  } catch (e) { toast('Kunde inte hämta från Drive: ' + friendlyDriveError(e), 'bad'); }
+}
+function afterClosingSaved(day) {
+  if (driveConfigured() && state.settings.driveAuto) { touchBackup({ csvDay: day, now: true }); toast('Dagsavslut sparat. Kopia skickas till Google Drive.'); }
+  else if (driveConfigured()) { state.meta.driveCsvDay = day; save(); toast('Dagsavslut sparat. Tryck Kopiera nu under Inställningar för att skicka till Drive.'); }
+  else toast('Dagsavslut sparat. Kom ihåg att spara en säkerhetskopia under Inställningar.', 'ok', { duration: 6000 });
 }
 
 // ---------- Backup ----------
@@ -1250,19 +1382,22 @@ function backup() {
   const content = JSON.stringify({ app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }, null, 1);
   exportDialog({ name: `lilbakery-kassa-backup-${dayKey()}.json`, content, type: 'application/json' });
 }
+async function applyBackup(data, sourceLabel) {
+  if (!data || data.app !== 'lilbakery-kassa' || !data.state) throw new Error('Filen är inte en säkerhetskopia från kassan.');
+  const n = migrate(data.state);
+  if (!(await confirmDialog({ title: 'Återställ från kopia', text: `Kopian innehåller ${n.receipts.length} kvitton och ${n.products.length} produkter (${esc(sourceLabel)}). Allt som finns i kassan nu ersätts.`, ok: 'Återställ', danger: true }))) return false;
+  if (!(await requirePin('Återställning kräver PIN'))) return false;
+  n.nextReceiptNr = Math.max(n.nextReceiptNr || 1, ...n.receipts.map((r) => r.nr + 1), 1);
+  const drive = { driveUrl: state.settings.driveUrl, driveKey: state.settings.driveKey, driveAuto: state.settings.driveAuto };
+  state = n; if (!state.settings.driveUrl) Object.assign(state.settings, drive);
+  state.meta.drivePending = false; save(); toast('Kopian är återställd'); render(); return true;
+}
 function restore() {
   const input = document.createElement('input'); input.type = 'file'; input.accept = '.json,application/json';
   input.addEventListener('change', async () => {
     const f = input.files[0]; if (!f) return;
-    try {
-      const data = JSON.parse(await f.text());
-      if (!data || data.app !== 'lilbakery-kassa' || !data.state) throw new Error('Filen är inte en säkerhetskopia från kassan.');
-      const s = migrate(data.state);
-      if (!(await confirmDialog({ title: 'Återställ från kopia', text: `Kopian innehåller ${s.receipts.length} kvitton och ${s.products.length} produkter från ${(data.exportedAt || '').slice(0, 10)}. Allt som finns i kassan nu ersätts.`, ok: 'Återställ', danger: true }))) return;
-      if (!(await requirePin('Återställning kräver PIN'))) return;
-      s.nextReceiptNr = Math.max(s.nextReceiptNr || 1, ...s.receipts.map((r) => r.nr + 1), 1);
-      state = s; save(); toast('Kopian är återställd'); render();
-    } catch (e) { toast(e.message || 'Kunde inte läsa filen', 'bad'); }
+    try { const data = JSON.parse(await f.text()); await applyBackup(data, `fil från ${(data.exportedAt || '').slice(0, 10)}`); }
+    catch (e) { toast(e.message || 'Kunde inte läsa filen', 'bad'); }
   });
   input.click();
 }
@@ -1308,8 +1443,8 @@ const actions = {
   'prod-down': ({ id }) => moveProduct(id, 1),
   'new-category': () => categoryDialog(null),
   'edit-category': ({ id }) => categoryDialog(id),
-  'cat-up': ({ id }) => { if (moveInArray(state.categories, state.categories.findIndex((c) => c.id === id), -1)) { save(); render(); } },
-  'cat-down': ({ id }) => { if (moveInArray(state.categories, state.categories.findIndex((c) => c.id === id), 1)) { save(); render(); } },
+  'cat-up': ({ id }) => { if (moveInArray(state.categories, state.categories.findIndex((c) => c.id === id), -1)) { save(); touchBackup(); render(); } },
+  'cat-down': ({ id }) => { if (moveInArray(state.categories, state.categories.findIndex((c) => c.id === id), 1)) { save(); touchBackup(); render(); } },
   import: () => importDialog(),
   'export-products': () => exportDialog({ name: `produkter-${dayKey()}.csv`, content: productsCsv() }),
   'dismiss-sample': () => { state.meta.sample = false; save(); render(); },
@@ -1318,6 +1453,10 @@ const actions = {
   backup: () => backup(),
   restore: () => restore(),
   wipe: () => wipe(),
+  'drive-test': () => driveTest(),
+  'drive-now': () => { state.meta.driveCsvDay = state.meta.driveCsvDay || (state.closings.some((c) => c.day === dayKey()) ? dayKey() : null); driveUpload({ toast: true }); },
+  'drive-restore': () => driveRestore(),
+  'copy-script': async () => { try { await navigator.clipboard.writeText(driveScriptText()); toast('Skriptet är kopierat. Klistra in det i script.google.com.'); } catch (e) { toast('Markera texten i rutan och kopiera den manuellt', 'bad'); } },
   install: async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; render(); }
 };
 document.addEventListener('click', (e) => {
@@ -1342,6 +1481,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.setting) e.target.blur();
 });
 window.addEventListener('online', updateOnline); window.addEventListener('offline', updateOnline);
+window.addEventListener('online', () => { if (state.meta.drivePending && driveConfigured() && state.settings.driveAuto) setTimeout(() => driveUpload().catch(() => {}), 2000); });
+if (state.meta.drivePending && driveConfigured() && state.settings.driveAuto) setTimeout(() => driveUpload().catch(() => {}), 6000);
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; if (ui.view === 'installningar') render(); });
 window.addEventListener('kassa:update', () => toast('En ny version av kassan finns.', 'ok', { action: 'Ladda om', onAction: () => location.reload() }));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then((p) => { ui.persisted = p; const el = $('#persist-state'); if (el) el.textContent = p ? 'ja' : 'nej'; }).catch(() => {});

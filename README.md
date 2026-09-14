@@ -83,6 +83,23 @@ på den enhet som används. Ingenting skickas någon annanstans. Därför:
 - Installera appen på hemskärmen på iPad. Då rensar inte Safari lagringen
   efter en tids inaktivitet, vilket kan hända för vanliga webbsidor.
 
+## Automatisk kopia till Google Drive
+
+Under *Inställningar → Google Drive* kan kassan skicka en kopia till din Drive
+efter varje köp och dagsavslut. Det sker via ett litet Apps Script-skript i ditt
+eget Google-konto, inga tredjepartstjänster:
+
+1. Öppna <https://script.google.com> på datorn och skapa ett nytt projekt.
+2. Klistra in skriptet som visas i appen (knappen *Kopiera skriptet*). Nyckeln
+   är redan ifylld.
+3. Distribuera → Ny distribution → Webbapp, *Kör som: Jag*, *Vem har åtkomst:
+   Alla*. Godkänn åtkomsten (Avancerat → Fortsätt → Tillåt).
+4. Klistra in webbappens adress i appen och tryck *Testa anslutningen*.
+
+Kopiorna hamnar i mappen *lil'bakery Kassa* på Drive: `kassa-backup-senaste.json`,
+en fil per dag och dagsavsluten som CSV. *Hämta senaste kopian* läser tillbaka
+kopian till en annan enhet.
+
 ## Ny version
 
 När filerna i mappen ändras: ändra `VERSION` i `sw.js` så att installerade
