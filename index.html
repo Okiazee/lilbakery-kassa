@@ -340,7 +340,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const APP_DATE = '2026-09-14';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -1050,6 +1050,7 @@ function renderInstallningar() {
             <li>Klicka <b>Distribuera</b> uppe till höger, sedan <b>Ny distribution</b>. Välj typ <b>Webbapp</b>. Sätt <i>Kör som</i> till <b>Jag</b> och <i>Vem har åtkomst</i> till <b>Alla</b>. Klicka Distribuera.</li>
             <li>Godkänn åtkomsten: välj ditt konto, klicka <b>Avancerat</b>, sedan <i>Fortsätt till projektet (osäkert)</i> och <b>Tillåt</b>. Varningen visas för att skriptet är ditt eget och inte granskat av Google.</li>
             <li>Kopiera <b>webbappens webbadress</b>, klistra in den i fältet ovan och tryck <b>Testa anslutningen</b>.</li>
+            <li>Ändrar du skriptet senare: Distribuera, <b>Hantera distributioner</b>, pennan, Version: <b>Ny version</b>, Distribuera. Adressen förblir densamma.</li>
           </ol>
           <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV.</p>
           <div class="btn-row"><button class="btn" data-action="copy-script">Kopiera skriptet</button></div>
@@ -1311,7 +1312,7 @@ function svar(obj) { return ContentService.createTextOutput(JSON.stringify(obj))
 }
 function driveStatus() {
   const m = state.meta;
-  if (!driveConfigured()) return { cls: '', text: 'Inte kopplad ännu. Följ stegen nedan.' };
+  if (!driveConfigured()) return { cls: (state.settings.driveUrl || '').trim() ? 'warn' : '', text: (state.settings.driveUrl || '').trim() ? driveUrlProblem() : 'Inte kopplad ännu. Följ stegen nedan.' };
   if (driveBusy) return { cls: '', text: 'Kopierar till Google Drive…' };
   const last = m.driveLastOk ? `Senast kopierad ${m.driveLastOk.slice(0, 10)} ${timeOf(m.driveLastOk)}.` : 'Ingen kopia skickad ännu.';
   if (m.drivePending && m.driveLastError) return { cls: 'warn', text: `${last} Senaste försöket misslyckades: ${m.driveLastError}` };
@@ -1325,51 +1326,66 @@ function touchBackup(opts = {}) {
   state.meta.drivePending = true; save(); updateDriveStatus();
   clearTimeout(driveTimer); driveTimer = setTimeout(() => driveUpload().catch(() => {}), opts.now ? 300 : 12000);
 }
-function friendlyDriveError(e) {
-  const msg = e && e.message ? e.message : String(e);
-  if (/JSON|Unexpected token|Failed to fetch|NetworkError|Load failed/i.test(msg)) return 'Skriptet svarade inte som väntat. Kontrollera adressen och att skriptet är distribuerat som webbapp med åtkomst för Alla.';
-  return msg;
+function friendlyDriveError(e) { return e && e.message ? e.message : String(e); }
+async function driveJson(url, opts) {
+  let res;
+  try { res = await fetch(url, opts); }
+  catch (e) { throw new Error('Anropet gick inte fram. Kontrollera uppkopplingen och att adressen är webbappens adress som slutar på /exec.'); }
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch (e) {
+    if (/accounts\.google\.com|ServiceLogin|Logga in|Sign in/i.test(text)) throw new Error('Google kräver inloggning för adressen. Öppna Distribuera, Hantera distributioner, pennan: sätt Kör som till Jag och Vem har åtkomst till Alla, välj Version: Ny version och tryck Distribuera.');
+    if (/Script function not found|doGet|doPost/i.test(text)) throw new Error('Skriptet saknar funktionen doGet eller doPost. Klistra in hela skriptet, spara, och gör en ny version av distributionen.');
+    if (/Authorization|Auktorisering|behörighet|permission/i.test(text)) throw new Error('Skriptet har inte fått tillgång till Drive. Öppna skriptet, välj funktionen doGet i verktygsraden, tryck Kör och godkänn åtkomsten. Gör sedan en ny version av distributionen.');
+    throw new Error(`Skriptet svarade med en webbsida i stället för data (status ${res.status}). Kontrollera att distributionen är en webbapp med Kör som Jag och åtkomst för Alla, och att du gjort en ny version efter ändringar.`);
+  }
 }
 async function driveUpload(opts = {}) {
-  if (!driveConfigured()) { if (opts.toast) toast('Fyll i webbappens adress under Google Drive först', 'bad'); return false; }
+  if (!driveConfigured()) { if (opts.toast) toast(driveUrlProblem() || 'Fyll i webbappens adress under Google Drive först', 'bad', { duration: 15000 }); return false; }
   if (driveBusy) return false;
   if (!navigator.onLine) { state.meta.drivePending = true; save(); updateDriveStatus(); if (opts.toast) toast('Ingen uppkoppling. Kopian skickas när nätet är tillbaka.', 'bad'); return false; }
   driveBusy = true; updateDriveStatus();
   try {
     const csvDay = state.meta.driveCsvDay; const hasClosing = csvDay && state.closings.some((c) => c.day === csvDay);
     const payload = { key: state.settings.driveKey || '', day: csvDay || dayKey(), csv: hasClosing ? closingCsv(csvDay) : null, backup: backupObject() };
-    const res = await fetch(state.settings.driveUrl.trim(), { method: 'POST', body: JSON.stringify(payload) });
-    const json = await res.json();
+    const json = await driveJson(state.settings.driveUrl.trim(), { method: 'POST', body: JSON.stringify(payload) });
     if (!json || !json.ok) throw new Error((json && json.error) || 'Skriptet svarade med fel');
     state.meta.drivePending = false; state.meta.driveCsvDay = null; state.meta.driveLastOk = new Date().toISOString(); state.meta.driveLastError = '';
     save(); if (opts.toast) toast('Säkerhetskopia sparad på Google Drive');
     return true;
   } catch (e) {
     state.meta.drivePending = true; state.meta.driveLastError = friendlyDriveError(e); save();
-    if (opts.toast) toast('Kunde inte kopiera till Drive: ' + state.meta.driveLastError, 'bad');
+    if (opts.toast) toast('Kunde inte kopiera till Drive: ' + state.meta.driveLastError, 'bad', { duration: 12000 });
     return false;
   } finally { driveBusy = false; updateDriveStatus(); }
 }
 async function driveFetchLatest() {
   const url = state.settings.driveUrl.trim() + '?key=' + encodeURIComponent(state.settings.driveKey || '') + '&t=' + Date.now();
-  const res = await fetch(url); return res.json();
+  return driveJson(url);
+}
+function driveUrlProblem() {
+  const u = (state.settings.driveUrl || '').trim(); if (!u) return 'Klistra in webbappens adress först. Den ska sluta på /exec.';
+  if (/\/dev\/?$/.test(u)) return 'Adressen slutar på /dev och är skriptets testadress. Gör en riktig distribution: Distribuera, Ny distribution, kugghjulet, Webbapp, Kör som Jag, åtkomst Alla. Kopiera sedan adressen som slutar på /exec.';
+  if (!driveConfigured()) return 'Adressen ser inte ut som en webbapp-adress. Den ska börja med https://script.google.com/macros/s/ och sluta på /exec.';
+  return '';
 }
 async function driveTest() {
-  if (!driveConfigured()) { toast('Klistra in webbappens adress först. Den ska sluta på /exec.', 'bad'); return; }
+  const problem = driveUrlProblem(); if (problem) { toast(problem, 'bad', { duration: 15000 }); return; }
   try {
     const json = await driveFetchLatest();
     if (json.ok) toast(`Anslutningen fungerar. Senaste kopia på Drive: ${json.updated.slice(0, 10)} ${timeOf(json.updated)}`);
     else if (json.error === 'Ingen kopia finns') toast('Anslutningen fungerar. Ingen kopia har skickats ännu.');
+    else if (json.error === 'Fel nyckel') throw new Error('Skriptet svarar men nyckeln stämmer inte. Nyckeln i fältet ovan måste vara exakt samma som NYCKEL i skriptet.');
     else throw new Error(json.error || 'Skriptet svarade med fel');
-  } catch (e) { toast('Anslutningen misslyckades: ' + friendlyDriveError(e), 'bad'); }
+  } catch (e) { toast('Anslutningen misslyckades: ' + friendlyDriveError(e), 'bad', { duration: 12000 }); }
 }
 async function driveRestore() {
-  if (!driveConfigured()) { toast('Klistra in webbappens adress först', 'bad'); return; }
+  const problem = driveUrlProblem(); if (problem) { toast(problem, 'bad', { duration: 15000 }); return; }
   try {
     const json = await driveFetchLatest();
     if (!json.ok) throw new Error(json.error || 'Skriptet svarade med fel');
     await applyBackup(json.backup, `Google Drive, kopian är från ${json.updated.slice(0, 10)} ${timeOf(json.updated)}`);
-  } catch (e) { toast('Kunde inte hämta från Drive: ' + friendlyDriveError(e), 'bad'); }
+  } catch (e) { toast('Kunde inte hämta från Drive: ' + friendlyDriveError(e), 'bad', { duration: 12000 }); }
 }
 function afterClosingSaved(day) {
   if (driveConfigured() && state.settings.driveAuto) { touchBackup({ csvDay: day, now: true }); toast('Dagsavslut sparat. Kopia skickas till Google Drive.'); }
