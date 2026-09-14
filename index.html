@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="format-detection" content="telephone=no">
+<title>lil'bakery Kassa</title>
+<!-- pwa-only --><link rel="manifest" href="manifest.webmanifest">
+<!-- pwa-only --><meta name="apple-mobile-web-app-capable" content="yes">
+<!-- pwa-only --><meta name="mobile-web-app-capable" content="yes">
+<!-- pwa-only --><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<!-- pwa-only --><meta name="apple-mobile-web-app-title" content="Kassa">
+<!-- pwa-only --><meta name="theme-color" content="#ffffff">
+<!-- pwa-only --><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<!-- pwa-only --><link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Sacramento&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --mist: #f3f8f8;
+  --line: #d9e9ea;
+  --line-strong: #a9d3d6;
+  --blue: #a9d3d6;
+  --blue-deep: #5f9ba0;
+  --blue-ink: #3b7a80;
+  --ink: #2f4a4d;
+  --muted: #6d8688;
+  --pink: #f3a6b4;
+  --pink-deep: #e2808f;
+  --pink-ink: #c4536a;
+  --good: #35915f; --good-bg: #e3f3ea;
+  --warn: #b97d12; --warn-bg: #fbf0d6;
+  --bad: #cf4b47; --bad-bg: #fbe4e3;
+  --cat-blue: #dceef0; --cat-pink: #fbe3e8; --cat-mint: #e0f2e6; --cat-butter: #fcf1d3; --cat-lavender: #ebe6f6; --cat-peach: #fde6d7;
+  --cat-blue-ink: #3b7a80; --cat-pink-ink: #c4536a; --cat-mint-ink: #35915f; --cat-butter-ink: #b8891a; --cat-lavender-ink: #6f5fa8; --cat-peach-ink: #c9683a;
+  --radius: 14px; --radius-lg: 20px;
+  --shadow: 0 1px 2px rgba(47,74,77,.06), 0 10px 30px rgba(47,74,77,.12);
+  --font: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --script: 'Sacramento', 'Brush Script MT', 'Snell Roundhand', cursive;
+  --topbar: 64px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { height: 100%; -webkit-text-size-adjust: 100%; }
+body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.4; -webkit-font-smoothing: antialiased; touch-action: manipulation; overscroll-behavior-y: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h2 { font-size: 17px; font-weight: 800; }
+p { margin: 0 0 10px; }
+small { font-size: 13px; }
+:focus-visible { outline: 3px solid var(--blue-deep); outline-offset: 2px; }
+.muted { color: var(--muted); }
+.num, .tabular { font-variant-numeric: tabular-nums; }
+.strike { text-decoration: line-through; opacity: .6; }
+.hidden { display: none !important; }
+
+/* ---------- App frame ---------- */
+.app { min-height: 100dvh; display: flex; flex-direction: column; }
+.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; min-height: var(--topbar); padding: 6px 16px; padding-top: calc(6px + env(safe-area-inset-top)); background: var(--bg); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand-cup { height: 42px; width: auto; }
+.brand-word { height: 30px; width: auto; margin-top: 6px; }
+.tabs { display: flex; gap: 2px; margin-left: auto; }
+.tab { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-weight: 800; font-size: 15px; }
+.tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.tab.is-active { background: var(--mist); color: var(--blue-ink); }
+.topbar-right { display: flex; align-items: center; gap: 10px; color: var(--muted); font-weight: 700; font-size: 14px; white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+main { flex: 1; width: 100%; max-width: 1400px; margin: 0 auto; padding: 16px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+/* ---------- Buttons & inputs ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 18px; border-radius: 999px; border: 1.5px solid var(--line-strong); background: #fff; color: var(--blue-ink); font-weight: 800; text-decoration: none; }
+.btn.small { min-height: 40px; padding: 6px 14px; font-size: 14px; }
+.btn.big { min-height: 60px; font-size: 18px; padding: 12px 26px; }
+.btn.primary { background: var(--blue-deep); border-color: var(--blue-deep); color: #fff; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.danger-ghost { border-color: var(--bad-bg); background: var(--bad-bg); color: var(--bad); }
+.btn.is-on { background: var(--cat-pink); border-color: var(--pink); color: var(--pink-ink); }
+.btn:disabled { opacity: .4; pointer-events: none; }
+.btn.pay { flex: 1; min-height: 64px; font-size: 19px; border: 0; color: #fff; }
+.btn.pay.swish { background: var(--pink-deep); }
+.btn.pay.cash { background: var(--blue-deep); }
+.icon-btn { width: 40px; height: 40px; border-radius: 999px; border: 0; background: var(--mist); color: var(--muted); font-size: 22px; line-height: 1; }
+.chip { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; font-weight: 800; font-size: 14px; color: var(--ink); white-space: nowrap; }
+.chip.is-active { border-color: var(--blue-deep); background: var(--blue-deep); color: #fff; }
+.chip.is-active .dot { box-shadow: 0 0 0 2px #fff inset; }
+.chip-strong { border-color: var(--blue-deep); color: var(--blue-ink); }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(47,74,77,.15); }
+.chip-art { width: 22px; height: 22px; color: var(--chip-ink, currentColor); flex: none; }
+.chip-art.is-photo { border-radius: 50%; object-fit: cover; }
+.chip.is-active .chip-art { color: #fff; }
+.input { min-height: 48px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; width: 100%; }
+.input:focus { outline: none; border-color: var(--blue-deep); box-shadow: 0 0 0 3px rgba(95,155,160,.2); }
+textarea.input { min-height: 80px; resize: vertical; }
+select.input { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 40px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field > span, .field > label { font-size: 13px; font-weight: 800; color: var(--muted); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 700; }
+.check input { width: 22px; height: 22px; accent-color: var(--blue-deep); }
+.seg { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: var(--mist); margin-bottom: 12px; }
+.seg-btn { flex: 1; min-height: 42px; border: 0; border-radius: 999px; background: transparent; font-weight: 800; color: var(--muted); }
+.seg-btn.is-active { background: #fff; color: var(--blue-ink); box-shadow: 0 1px 3px rgba(47,74,77,.15); }
+.hint { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius); background: var(--cat-butter); color: #6b5410; font-weight: 600; margin-bottom: 14px; }
+.notice .btn { margin-left: auto; }
+
+/* ---------- Page scaffolding ---------- */
+.page-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+.page-head h1 { font-size: 24px; font-weight: 800; margin-right: auto; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.toolbar .input { width: auto; }
+.lead { color: var(--muted); font-weight: 600; margin-bottom: 14px; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 18px; }
+.card + .card { margin-top: 14px; }
+.card h2 { margin-bottom: 12px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+@media (max-width: 899px) { .two-col { grid-template-columns: 1fr; } }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.stat { padding: 12px 14px; border-radius: var(--radius); background: var(--mist); }
+.stat-label { display: block; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.stat-value { display: block; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat-value small { font-size: 14px; color: var(--muted); font-weight: 700; }
+.stat.swish { background: var(--cat-pink); } .stat.cash { background: var(--cat-blue); }
+.table-wrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.table th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.table td.num, .table th.num { text-align: right; white-space: nowrap; }
+.table tr.total td { font-weight: 800; border-bottom: 0; }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.kv:last-child { border-bottom: 0; }
+.kv b { white-space: nowrap; }
+.kv.big { font-size: 20px; }
+.diff-good { color: var(--good); } .diff-bad { color: var(--bad); } .diff-warn { color: var(--warn); }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; text-align: left; }
+.row.is-off { opacity: .55; }
+.row-nr { font-weight: 800; color: var(--blue-ink); font-variant-numeric: tabular-nums; }
+.row-main { min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row-side { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.row-sum { font-variant-numeric: tabular-nums; }
+.row-emoji { width: 32px; text-align: center; font-size: 22px; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.badge.ok { background: var(--good-bg); color: var(--good); }
+.badge.void, .badge.off { background: var(--bad-bg); color: var(--bad); }
+.badge.swish { background: var(--cat-pink); color: var(--pink-ink); }
+.badge.kontant { background: var(--cat-blue); color: var(--blue-ink); }
+.badge.vat { background: var(--mist); color: var(--muted); }
+.group { margin-bottom: 18px; }
+.group-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 6px 4px; color: var(--muted); font-weight: 700; }
+.group-head b { color: var(--ink); text-transform: capitalize; }
+.empty { padding: 40px 20px; text-align: center; color: var(--muted); font-weight: 600; border: 1.5px dashed var(--line); border-radius: var(--radius-lg); }
+.empty.small { padding: 24px 12px; border: 0; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn-row.end { justify-content: flex-end; }
+.fine { font-size: 13px; color: var(--muted); }
+.steps { margin: 0; padding-left: 20px; }
+.steps li { margin-bottom: 6px; }
+
+/* ---------- Kassa ---------- */
+.kassa { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+@media (max-width: 1023px) { .kassa { grid-template-columns: minmax(0, 1fr) 320px; } }
+.cat-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.search { flex: 1; min-width: 160px; margin-left: auto; }
+.search .input { min-height: 42px; border-radius: 999px; padding: 6px 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { position: relative; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 8px; min-height: 100px; padding: 12px 14px; border: 1.5px solid transparent; border-radius: var(--radius); background: var(--tile, var(--mist)); text-align: left; transition: transform .08s ease; }
+.tile:active { transform: scale(.96); border-color: var(--blue-deep); }
+.tile-emoji { font-size: 24px; line-height: 1; }
+.tile-name { font-weight: 800; font-size: 16px; line-height: 1.2; overflow-wrap: anywhere; }
+.tile-price { font-weight: 800; color: var(--blue-ink); font-variant-numeric: tabular-nums; }
+.art { stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.tile-art { position: absolute; top: 10px; right: 10px; width: 44px; height: 44px; color: var(--tile-ink, var(--blue-ink)); }
+.tile-art.is-photo { width: 54px; height: 54px; border-radius: 12px; object-fit: cover; box-shadow: 0 1px 3px rgba(47,74,77,.25); }
+.tile.has-art .tile-name { padding-right: 46px; }
+.tile.has-photo .tile-name { padding-right: 56px; }
+.tile-qty { position: absolute; bottom: 10px; right: 10px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px; background: var(--pink-ink); color: #fff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.cart-pane { position: sticky; top: calc(var(--topbar) + 12px); display: flex; flex-direction: column; max-height: calc(100dvh - var(--topbar) - 28px); background: var(--mist); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+.cart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.cart-title { font-weight: 800; font-size: 18px; }
+.cart-nr { color: var(--muted); font-weight: 700; }
+.cart-head-btns { display: flex; gap: 4px; }
+.cart-close { display: none; }
+.cart-lines { flex: 1; min-height: 120px; overflow-y: auto; padding: 6px 12px; }
+.line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.line:last-child { border-bottom: 0; }
+.line-name { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.line-name small { display: block; color: var(--muted); font-weight: 600; }
+.qty { display: inline-flex; align-items: center; gap: 2px; }
+.qty span { min-width: 30px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+.qty-btn { width: 38px; height: 38px; border-radius: 999px; border: 1.5px solid var(--line-strong); background: #fff; color: var(--blue-ink); font-size: 20px; font-weight: 800; line-height: 1; }
+.line-sum { min-width: 64px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cart-foot { padding: 12px 16px 16px; border-top: 1px solid var(--line); background: #fff; }
+.cart-tools { display: flex; gap: 8px; margin-bottom: 10px; }
+.cart-tools .btn { flex: 1; }
+.cart-sub { display: flex; justify-content: space-between; color: var(--muted); font-weight: 700; padding: 2px 0; font-variant-numeric: tabular-nums; }
+.cart-total { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0 12px; font-weight: 800; }
+.cart-total b { font-size: 30px; font-variant-numeric: tabular-nums; }
+.pay-row { display: flex; gap: 10px; }
+.cart-bar { display: none; }
+
+/* ---------- Modals ---------- */
+.modal-wrap { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(47,74,77,.38); }
+.modal { width: min(520px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; animation: pop .16s ease-out; }
+.modal.wide { width: min(760px, 100%); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { font-size: 19px; }
+.modal-body { padding: 16px 20px; overflow-y: auto; }
+.modal-foot { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--mist); }
+.modal-foot .btn.big { flex: 1; }
+.modal-text { font-size: 16px; }
+@keyframes pop { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.pay-total { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 16px; border-radius: var(--radius); background: var(--mist); margin-bottom: 12px; font-weight: 800; }
+.pay-total b { font-size: 34px; font-variant-numeric: tabular-nums; }
+.quick-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.keypad-display { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 58px; padding: 10px 16px; margin-bottom: 12px; border-radius: var(--radius); border: 1.5px solid var(--line); }
+.keypad-label { font-weight: 800; color: var(--muted); }
+.keypad-value { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; min-height: 1.2em; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.key { min-height: 56px; border-radius: var(--radius); border: 1px solid var(--line); background: #fff; font-size: 22px; font-weight: 700; }
+.key:active { background: var(--mist); }
+.change-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; padding: 10px 16px; border-radius: var(--radius); background: var(--cat-blue); font-weight: 800; }
+.change-row b { font-size: 28px; font-variant-numeric: tabular-nums; }
+.change-row.short { background: var(--warn-bg); color: var(--warn); }
+.swish-box { display: flex; justify-content: center; margin: 4px auto 10px; max-width: 300px; }
+.swish-box svg { width: 100%; height: auto; display: block; }
+.swish-number { text-align: center; font-size: 18px; margin: 0 0 4px; }
+.swish-number b { font-variant-numeric: tabular-nums; }
+.done { text-align: center; padding: 8px 0 4px; }
+.done-title { font-family: var(--script); font-size: 64px; line-height: 1; color: var(--blue-ink); margin-bottom: 4px; }
+.done-sum { font-size: 20px; font-weight: 800; }
+.done-change { margin: 14px auto 0; max-width: 300px; padding: 12px 16px; border-radius: var(--radius); background: var(--cat-pink); color: var(--pink-ink); font-weight: 800; }
+.done-change b { display: block; font-size: 40px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.done-nr { color: var(--muted); font-weight: 700; margin-top: 10px; }
+
+/* ---------- Receipt paper ---------- */
+.paper { position: relative; margin: 0 auto; max-width: 380px; padding: 18px 20px; background: #fff; border: 1.5px dashed var(--line-strong); border-radius: 6px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.paper-brand { text-align: center; margin-bottom: 6px; }
+.paper-brand img { height: 64px; width: auto; }
+.paper-meta { text-align: center; color: var(--muted); font-size: 13px; font-weight: 600; }
+.paper hr { border: 0; border-top: 1.5px dashed var(--line-strong); margin: 10px 0; }
+.paper-line { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+.paper-line span:last-child { white-space: nowrap; }
+.paper-total { font-size: 20px; font-weight: 800; }
+.paper-vat { color: var(--muted); font-size: 13px; }
+.paper-void { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--bad-bg); color: var(--bad); font-weight: 800; text-align: center; }
+.paper.is-void::after { content: 'MAKULERAT'; position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%) rotate(-18deg); font-size: 44px; font-weight: 800; letter-spacing: .1em; color: rgba(207,75,71,.22); pointer-events: none; }
+.paper-thanks { font-family: var(--script); font-size: 32px; text-align: center; color: var(--blue-ink); margin-top: 10px; line-height: 1.1; }
+
+/* ---------- Products ---------- */
+.cat-card { margin-bottom: 14px; }
+.cat-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cat-head h2 { margin: 0; }
+.cat-head .dot { width: 16px; height: 16px; }
+.cat-art { width: 28px; height: 28px; color: var(--chip-ink, var(--blue-ink)); flex: none; }
+.cat-art.is-photo { border-radius: 8px; object-fit: cover; }
+.cat-btns { margin-left: auto; display: flex; gap: 4px; }
+.prod-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 56px; padding: 6px 8px 6px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.prod-row.is-off { opacity: .5; }
+.prod-main { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; border: 0; background: transparent; text-align: left; padding: 0; font-weight: 800; }
+.prod-main small { color: var(--muted); font-weight: 600; }
+.prod-price { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mini-btns { display: flex; gap: 2px; }
+.mini { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--muted); font-size: 16px; }
+.mini:disabled { opacity: .3; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; }
+.swatch.is-active { border-color: var(--blue-ink); }
+.import-table td, .import-table th { padding: 6px 8px; }
+.import-table input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--blue-deep); }
+.drop { padding: 18px; border: 2px dashed var(--line-strong); border-radius: var(--radius); text-align: center; background: var(--mist); }
+.drop input { display: block; margin: 8px auto 0; max-width: 100%; }
+
+.art-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
+.art-opt { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 72px; padding: 8px 4px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.art-opt .art { width: 34px; height: 34px; color: var(--blue-ink); }
+.art-opt img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; }
+.art-opt .art-none, .art-opt .art-plus { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--blue-ink); }
+.art-opt.is-active { border-color: var(--blue-deep); background: var(--mist); color: var(--blue-ink); }
+.art-opt input { display: none; }
+
+/* ---------- Toast ---------- */
+#toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
+.toast { pointer-events: auto; display: flex; gap: 12px; align-items: center; padding: 12px 18px; border-radius: 999px; background: var(--ink); color: #fff; font-weight: 700; box-shadow: var(--shadow); animation: pop .2s ease-out; }
+.toast.bad { background: var(--bad); }
+.toast button { border: 0; background: rgba(255,255,255,.2); color: #fff; border-radius: 999px; padding: 6px 12px; font-weight: 800; }
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 759px) {
+  :root { --topbar: 56px; }
+  .topbar { gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .brand-cup { height: 34px; } .brand-word { height: 22px; margin-top: 4px; }
+  .topbar-right { margin-left: auto; font-size: 13px; }
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); justify-content: space-around; }
+  .tab { flex: 1; flex-direction: column; gap: 2px; min-width: 0; padding: 6px 2px; font-size: 11px; border-radius: 12px; }
+  main { padding: 12px; padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+  .kassa { grid-template-columns: 1fr; }
+  .cart-pane { display: none; position: fixed; inset: 0; z-index: 40; max-height: none; border-radius: 0; border: 0; }
+  .kassa.cart-open .cart-pane { display: flex; }
+  .cart-pane .cart-head { padding-top: calc(12px + env(safe-area-inset-top)); }
+  .cart-close { display: inline-flex; }
+  .cart-foot { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .cart-bar { display: flex; position: fixed; left: 12px; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 30; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 8px 8px 8px 18px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font-weight: 800; box-shadow: var(--shadow); }
+  .cart-bar .btn { min-height: 44px; background: var(--pink-deep); border: 0; color: #fff; }
+  .cart-bar.is-empty { opacity: .6; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .modal-wrap { align-items: flex-end; padding: 0; }
+  .modal { width: 100%; max-height: calc(100dvh - 20px); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  #toast { bottom: calc(150px + env(safe-area-inset-bottom)); }
+  .page-head h1 { font-size: 21px; }
+  .field-row { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand"><img class="brand-cup" src="img/cupcake.png" alt=""><img class="brand-word" src="img/wordmark.png" alt="lil'bakery"></div>
+    <div class="topbar-right"><span id="offline" class="pill hidden">Offline</span><span id="clock" class="tabular"></span></div>
+    <nav class="tabs" id="nav" aria-label="Huvudmeny"></nav>
+  </header>
+  <main id="view"></main>
+  <div id="toast" aria-live="polite"></div>
+  <div id="modal-root"></div>
+</div>
+<script>
+(() => {
+'use strict';
+const APP_VERSION = '1.1.0';
+const APP_DATE = '2026-09-14';
+const STORE_KEY = 'lilbakery.kassa.v1';
+const VAT_RATES = [6, 12, 25, 0];
+const CAT_COLORS = ['butter', 'pink', 'peach', 'blue', 'mint', 'lavender'];
+const ICONS = {
+  kassa: '<svg viewBox="0 0 24 24"><path d="M4 8h16l-1.5 11h-13z"/><path d="M8.5 8V6.5a3.5 3.5 0 0 1 7 0V8"/><path d="M9 12v3M15 12v3"/></svg>',
+  kvitton: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+  dagsavslut: '<svg viewBox="0 0 24 24"><path d="M3 18h18"/><path d="M6 14a6 6 0 0 1 12 0"/><path d="M12 4v3M5 8l1.5 1.5M19 8l-1.5 1.5"/></svg>',
+  produkter: '<svg viewBox="0 0 24 24"><path d="M3 12l9-9h9v9l-9 9z"/><circle cx="16" cy="8" r="1.2"/></svg>',
+  installningar: '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="#fff"/><circle cx="15" cy="12" r="2" fill="#fff"/><circle cx="10" cy="17" r="2" fill="#fff"/></svg>'
+};
+const VIEWS = [['kassa', 'Kassa'], ['kvitton', 'Kvitton'], ['dagsavslut', 'Dagsavslut'], ['produkter', 'Produkter'], ['installningar', 'Inställningar']];
+// ---------- Kategoribilder (tecknade i loggans stil) ----------
+const ART = {
+  cookie: '<circle cx="32" cy="32" r="22"/><circle cx="24" cy="25" r="1.5"/><circle cx="37" cy="22" r="1.5"/><circle cx="42" cy="35" r="1.5"/><circle cx="26" cy="38" r="1.5"/><circle cx="34" cy="44" r="1.5"/>',
+  cupcake: '<path d="M21 36 L25 54 H39 L43 36"/><path d="M29 42 L30 49 M35 42 L34 49"/><path d="M17 36 C11 36 11 27 18 27 C18 18 30 15 34 22 C42 18 50 26 46 36 Z"/>',
+  muffin: '<path d="M20 36 L24 54 H40 L44 36"/><path d="M29 42 L30 49 M35 42 L34 49"/><path d="M17 36 A15 13 0 0 1 47 36"/><circle cx="27" cy="30" r="1.5"/><circle cx="36" cy="27" r="1.5"/><circle cx="40" cy="33" r="1.5"/>',
+  brownie: '<path d="M12 30 H44 V50 H12 Z"/><path d="M12 30 L20 20 H52 L44 30"/><path d="M44 30 L52 20 V40 L44 50"/><circle cx="30" cy="25" r="1.5"/><circle cx="40" cy="24" r="1.5"/>',
+  cake: '<rect x="10" y="37" width="44" height="15" rx="3"/><rect x="19" y="26" width="26" height="11" rx="3"/><path d="M32 26 V17"/><circle cx="32" cy="13" r="2.5"/>',
+  cakeslice: '<path d="M10 50 L54 18 V50 Z"/><path d="M23 41 H54 M38 30 H54"/><circle cx="47" cy="12" r="2.5"/><path d="M47 15 L52 19"/>',
+  donut: '<circle cx="32" cy="34" r="20"/><circle cx="32" cy="34" r="7"/><path d="M20 24 l3 -2 M42 22 l3 2 M18 40 l3 1 M44 42 l3 -1 M31 17 h3"/>',
+  cinnamonbun: '<path d="M28 34 a4 4 0 0 1 8 0 a8 8 0 0 1 -16 0 a12 12 0 0 1 24 0 a16 16 0 0 1 -32 0 a20 20 0 0 1 40 0"/>',
+  croissant: '<path d="M10 40 C12 24 24 14 32 16 C40 14 52 24 54 40 C48 34 40 30 32 31 C24 30 16 34 10 40 Z"/><path d="M22 23 L24 31 M42 23 L40 31"/>',
+  bread: '<path d="M13 48 V32 a10 10 0 0 1 10 -10 H41 a10 10 0 0 1 10 10 V48 Z"/><path d="M22 36 l4 -5 M31 36 l4 -5 M40 36 l4 -5"/>',
+  macaron: '<path d="M13 27 a19 9 0 0 1 38 0 Z"/><path d="M13 37 a19 9 0 0 0 38 0 Z"/><path d="M14 32 H50"/>',
+  icecream: '<circle cx="32" cy="24" r="11"/><path d="M22 32 L32 54 L42 32"/><path d="M27 40 l7 -5 M28 47 l8 -7"/>',
+  coffee: '<path d="M15 27 H44 V45 a6 6 0 0 1 -6 6 H21 a6 6 0 0 1 -6 -6 Z"/><path d="M44 32 h4 a6 6 0 0 1 0 12 h-4"/><path d="M24 21 c0 -4 4 -4 4 -8 M35 21 c0 -4 4 -4 4 -8"/>',
+  tea: '<path d="M14 30 H46 V40 a10 10 0 0 1 -10 10 H24 a10 10 0 0 1 -10 -10 Z"/><path d="M10 54 H50"/><path d="M46 33 h3 a5 5 0 0 1 0 10 h-4"/><path d="M38 19 l-4 11"/><rect x="36" y="12" width="6" height="7" rx="1"/>',
+  cup: '<rect x="15" y="17" width="34" height="8" rx="2"/><path d="M26 17 V12 H38 V17"/><path d="M18 25 L22 54 H42 L46 25"/><path d="M21 36 H43"/>',
+  glass: '<path d="M19 20 L23 54 H41 L45 20 Z"/><path d="M22 34 H42"/><path d="M46 8 L36 24"/><circle cx="29" cy="42" r="1.5"/><circle cx="35" cy="46" r="1.5"/>',
+  bottle: '<path d="M27 10 H37 V18 C42 22 44 26 44 32 V50 a4 4 0 0 1 -4 4 H24 a4 4 0 0 1 -4 -4 V32 C20 26 22 22 27 18 Z"/><path d="M22 36 H42 M22 44 H42"/>',
+  candy: '<circle cx="32" cy="32" r="10"/><path d="M22 32 l-8 -6 v12 z M42 32 l8 -6 v12 z"/>',
+  heart: '<path d="M32 52 C20 43 11 35 13 25 C15 16 26 15 32 23 C38 15 49 16 51 25 C53 35 44 43 32 52 Z"/>',
+  gift: '<rect x="14" y="30" width="36" height="22" rx="2"/><rect x="11" y="22" width="42" height="8" rx="2"/><path d="M32 22 V52"/><path d="M32 22 c-6 -8 -12 -4 -6 0 M32 22 c6 -8 12 -4 6 0"/>',
+  star: '<path d="M32 13 L36.7 26.5 L51 26.8 L39.6 35.5 L43.8 49.2 L32 41 L20.2 49.2 L24.4 35.5 L13 26.8 L27.3 26.5 Z"/>'
+};
+const ART_LABELS = { cookie: 'Cookie', cupcake: 'Cupcake', muffin: 'Muffin', brownie: 'Brownie', cake: 'Tårta', cakeslice: 'Tårtbit', donut: 'Munk', cinnamonbun: 'Bulle', croissant: 'Croissant', bread: 'Bröd', macaron: 'Macaron', icecream: 'Glass', coffee: 'Kaffe', tea: 'Te', cup: 'Take away', glass: 'Kall dryck', bottle: 'Flaska', candy: 'Godis', heart: 'Hjärta', gift: 'Present', star: 'Stjärna' };
+const ICON_GUESS = [
+  [/cookie|kaka|kakor|kex/, 'cookie'], [/minicake|cupcake/, 'cupcake'], [/muffin/, 'muffin'], [/brownie|blondie/, 'brownie'],
+  [/tårtbit|slice/, 'cakeslice'], [/tårta|tarta|cake|bakelse/, 'cake'], [/donut|munk/, 'donut'], [/bull|kanel/, 'cinnamonbun'],
+  [/croissant|wiener|giffel/, 'croissant'], [/bröd|brod|bread|limpa|surdeg|fralla/, 'bread'], [/macaron/, 'macaron'], [/glass|ice ?cream/, 'icecream'],
+  [/kaffe|coffee|latte|cappuccino|espresso/, 'coffee'], [/\bte\b|\btea\b|chai/, 'tea'], [/take ?away|mugg/, 'cup'], [/flask|bottle/, 'bottle'],
+  [/dryck|drink|läsk|lask|juice|saft|vatten|smoothie|kall/, 'glass'], [/godis|candy|karamell/, 'candy'], [/present|paket|gift|låda/, 'gift'], [/hjärta|heart|kärlek/, 'heart']
+];
+function guessIcon(name) { const n = String(name || '').toLowerCase(); const hit = ICON_GUESS.find(([re]) => re.test(n)); return hit ? hit[1] : null; }
+function svgArt(name, cls = '') { return ART[name] ? `<svg class="art ${cls}" viewBox="0 0 64 64" aria-hidden="true">${ART[name]}</svg>` : ''; }
+const photoUrls = new Map();
+function photoSrc(data) {
+  if (!photoUrls.has(data)) {
+    try { const b64 = data.split(',')[1]; const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); photoUrls.set(data, URL.createObjectURL(new Blob([arr], { type: 'image/jpeg' }))); }
+    catch (e) { photoUrls.set(data, data); }
+  }
+  return photoUrls.get(data);
+}
+function catArt(cat, cls) {
+  const im = cat && cat.image; if (!im) return '';
+  if (im.kind === 'photo' && im.data) return `<img class="${cls} is-photo" src="${photoSrc(im.data)}" alt="">`;
+  if (im.kind === 'icon') return svgArt(im.icon, cls);
+  return '';
+}
+function readImageFile(file, size = 320) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      try {
+        const side = Math.min(img.naturalWidth, img.naturalHeight); const sx = (img.naturalWidth - side) / 2; const sy = (img.naturalHeight - side) / 2;
+        const c = document.createElement('canvas'); c.width = c.height = size; const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size); ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg', 0.82));
+      } catch (e) { URL.revokeObjectURL(url); reject(new Error('Kunde inte läsa bilden')); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Filen är inte en bild som webbläsaren kan läsa')); };
+    img.src = url;
+  });
+}
+
+
+// ---------- Helpers ----------
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const nf = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 2 });
+const kr = (n) => nf.format(r2(n)) + ' kr';
+const pad = (n) => String(n).padStart(2, '0');
+const sum = (arr, fn) => arr.reduce((s, x) => s + fn(x), 0);
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const timeOf = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const dayFmt = new Intl.DateTimeFormat('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const fmtDay = (key) => { const [y, m, d] = key.split('-').map(Number); return dayFmt.format(new Date(y, m - 1, d)); };
+const shiftDay = (key, n) => { const [y, m, d] = key.split('-').map(Number); return dayKey(new Date(y, m - 1, d + n)); };
+const paymentName = (p) => (p === 'swish' ? 'Swish' : 'Kontant');
+const parseNum = (v) => { const n = parseFloat(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+const isTouch = () => navigator.maxTouchPoints > 1;
+
+// ---------- State ----------
+function defaultSettings() {
+  return { foretag: "lil'bakery", orgnr: '', adress: '', swish: '', kvittoText: 'Tack för ditt köp!', momsStandard: 6, pin: '', vaxelkassa: 500 };
+}
+function seedState() {
+  const cats = [
+    { id: 'c-cookies', name: 'Cookies', color: 'butter', image: { kind: 'icon', icon: 'cookie' } },
+    { id: 'c-minicakes', name: 'Minicakes', color: 'pink', image: { kind: 'icon', icon: 'cupcake' } },
+    { id: 'c-brownies', name: 'Brownies', color: 'peach', image: { kind: 'icon', icon: 'brownie' } },
+    { id: 'c-dryck', name: 'Dryck', color: 'blue', image: { kind: 'icon', icon: 'glass' } }
+  ];
+  const P = (name, price, categoryId) => ({ id: uid(), name, price, vat: 6, categoryId, emoji: '', active: true });
+  const products = [
+    P('Chocolate chip', 35, 'c-cookies'), P('Red velvet', 35, 'c-cookies'), P('Biscoff', 35, 'c-cookies'), P('Oreo', 35, 'c-cookies'), P('Salted caramel', 35, 'c-cookies'),
+    P('Vanilj', 45, 'c-minicakes'), P('Choklad', 45, 'c-minicakes'), P('Hallon', 45, 'c-minicakes'), P('Citron', 45, 'c-minicakes'),
+    P('Klassisk brownie', 40, 'c-brownies'), P('Nutella brownie', 45, 'c-brownies'), P('Biscoff brownie', 45, 'c-brownies'),
+    P('Kaffe', 25, 'c-dryck'), P('Te', 20, 'c-dryck'), P('Läsk', 20, 'c-dryck'), P('Vatten', 15, 'c-dryck')
+  ];
+  return { version: 1, settings: defaultSettings(), categories: cats, products, receipts: [], closings: [], cart: { lines: [], discount: null }, nextReceiptNr: 1, meta: { sample: true, createdAt: new Date().toISOString() } };
+}
+function migrate(s) {
+  s.settings = Object.assign(defaultSettings(), s.settings || {});
+  s.categories = s.categories || []; s.products = s.products || []; s.receipts = s.receipts || []; s.closings = s.closings || [];
+  s.cart = s.cart || { lines: [], discount: null }; s.nextReceiptNr = s.nextReceiptNr || 1; s.meta = s.meta || {};
+  s.categories.forEach((c) => { if (c.image === undefined) { const g = guessIcon(c.name); c.image = g ? { kind: 'icon', icon: g } : null; } });
+  return s;
+}
+function load() {
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) return migrate(JSON.parse(raw)); }
+  catch (e) { console.warn('Kunde inte läsa sparad data', e); }
+  return seedState();
+}
+let state = load();
+const ui = { view: 'kassa', cat: 'all', search: '', cartOpen: false, kvittoDay: dayKey(), kvittoAll: false, kvittoSearch: '', closeDay: dayKey() };
+let installPrompt = null;
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  catch (e) { toast('Kunde inte spara. Lagringen är full eller blockerad.', 'bad'); }
+}
+
+// ---------- Cart maths ----------
+function cartTotals(cart = state.cart) {
+  const lines = cart.lines;
+  const gross = r2(sum(lines, (l) => l.price * l.qty));
+  let discount = null;
+  if (cart.discount && gross > 0) {
+    const d = cart.discount;
+    let amount = d.type === 'procent' ? Math.round(gross * d.value / 100) : Math.round(d.value);
+    amount = Math.max(0, Math.min(amount, gross));
+    discount = { type: d.type, value: d.value, amount, reason: d.reason || '' };
+  }
+  const total = r2(gross - (discount ? discount.amount : 0));
+  const byRate = new Map();
+  for (const l of lines) byRate.set(l.vat, r2((byRate.get(l.vat) || 0) + l.price * l.qty));
+  const rates = [...byRate.keys()].sort((a, b) => b - a);
+  const vatLines = []; let allocated = 0;
+  rates.forEach((rate, i) => {
+    const g = byRate.get(rate);
+    const gAfter = i === rates.length - 1 ? r2(total - allocated) : r2(g - (discount ? discount.amount * g / gross : 0));
+    allocated = r2(allocated + gAfter);
+    const net = r2(gAfter / (1 + rate / 100));
+    vatLines.push({ rate, gross: gAfter, net, vat: r2(gAfter - net) });
+  });
+  return { gross, discount, total, vatLines, count: sum(lines, (l) => l.qty) };
+}
+function quickAmounts(total) {
+  const out = [total];
+  for (const step of [20, 50, 100, 200, 500, 1000]) { const v = Math.ceil(total / step) * step; if (v > total && !out.includes(v)) out.push(v); }
+  return out.slice(0, 5);
+}
+
+// ---------- Rendering ----------
+function render() {
+  document.body.classList.toggle('cart-open', ui.view === 'kassa' && ui.cartOpen);
+  $('#nav').innerHTML = VIEWS.map(([id, label]) => `<button class="tab ${ui.view === id ? 'is-active' : ''}" data-action="view" data-id="${id}" ${ui.view === id ? 'aria-current="page"' : ''}>${ICONS[id]}<span>${label}</span></button>`).join('');
+  const fn = { kassa: renderKassa, kvitton: renderKvitton, dagsavslut: renderDagsavslut, produkter: renderProdukter, installningar: renderInstallningar }[ui.view];
+  $('#view').innerHTML = fn();
+  window.scrollTo(0, 0);
+}
+function tick() {
+  const d = new Date();
+  $('#clock').textContent = new Intl.DateTimeFormat('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }).format(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const today = dayKey();
+  if (ui.kvittoDay !== today && ui._autoDay === ui.kvittoDay) { ui.kvittoDay = today; ui.closeDay = today; }
+  ui._autoDay = ui.kvittoDay;
+}
+function updateOnline() { $('#offline').classList.toggle('hidden', navigator.onLine !== false); }
+
+// --- Kassa ---
+function catOf(id) { return state.categories.find((c) => c.id === id); }
+function visibleProducts() {
+  const q = ui.search.trim().toLowerCase();
+  return state.products.filter((p) => p.active !== false).filter((p) => (q ? p.name.toLowerCase().includes(q) : ui.cat === 'all' || p.categoryId === ui.cat));
+}
+function cartQtyMap() { const m = new Map(); state.cart.lines.forEach((l) => { if (l.productId) m.set(l.productId, (m.get(l.productId) || 0) + l.qty); }); return m; }
+function gridHtml() {
+  const products = visibleProducts(); const inCart = cartQtyMap();
+  if (!products.length) return `<div class="empty">${state.products.length ? 'Inga produkter matchar sökningen.' : 'Inga produkter ännu. Lägg till dem under Produkter.'}</div>`;
+  return `<div class="grid">${products.map((p) => { const c = catOf(p.categoryId); const col = c ? c.color : 'blue'; const qty = inCart.get(p.id); const art = catArt(c, 'tile-art'); const photo = c && c.image && c.image.kind === 'photo'; return `<button class="tile ${art ? 'has-art' : ''} ${photo ? 'has-photo' : ''}" style="--tile:var(--cat-${col});--tile-ink:var(--cat-${col}-ink)" data-action="add" data-id="${p.id}">${art}${p.emoji ? `<span class="tile-emoji">${esc(p.emoji)}</span>` : ''}<span class="tile-name">${esc(p.name)}</span><span class="tile-price">${kr(p.price)}</span>${qty ? `<span class="tile-qty">${qty}</span>` : ''}</button>`; }).join('')}</div>`;
+}
+function renderKassa() {
+  const q = ui.search.trim();
+  const chips = `<button class="chip ${ui.cat === 'all' && !q ? 'is-active' : ''}" data-action="cat" data-id="all">Alla</button>` +
+    state.categories.map((c) => `<button class="chip ${ui.cat === c.id && !q ? 'is-active' : ''}" style="--chip-ink:var(--cat-${c.color}-ink)" data-action="cat" data-id="${c.id}">${catArt(c, 'chip-art') || `<i class="dot" style="background:var(--cat-${c.color})"></i>`}${esc(c.name)}</button>`).join('');
+  return `<section class="kassa ${ui.cartOpen ? 'cart-open' : ''}" id="kassa">
+    <div class="products-pane">
+      <div class="cat-row">${chips}<label class="search"><input type="search" class="input" placeholder="Sök produkt" value="${esc(ui.search)}" data-role="search" aria-label="Sök produkt" autocomplete="off"></label></div>
+      <div id="grid-wrap">${gridHtml()}</div>
+    </div>
+    <aside class="cart-pane" id="cart-pane" aria-label="Aktuellt köp">${cartInner()}</aside>
+    ${cartBarHtml()}
+  </section>`;
+}
+function cartBarHtml() {
+  const t = cartTotals();
+  return `<button class="cart-bar ${t.count ? '' : 'is-empty'}" id="cart-bar" data-action="open-cart"><span>${t.count ? `${t.count} ${t.count === 1 ? 'vara' : 'varor'} · ${kr(t.total)}` : 'Inga varor valda'}</span><span class="btn small">${t.count ? 'Till betalning' : 'Visa köp'}</span></button>`;
+}
+function cartInner() {
+  const t = cartTotals(); const lines = state.cart.lines; const std = state.settings.momsStandard;
+  const rows = lines.map((l, i) => `<div class="line"><div class="line-name">${esc(l.name)}<small>${kr(l.price)}${l.vat !== std ? ` · moms ${l.vat} %` : ''}</small></div><div class="qty"><button class="qty-btn" data-action="dec" data-i="${i}" aria-label="Minska antal">−</button><span>${l.qty}</span><button class="qty-btn" data-action="inc" data-i="${i}" aria-label="Öka antal">+</button></div><div class="line-sum">${kr(l.price * l.qty)}</div></div>`).join('');
+  return `<div class="cart-head"><div><span class="cart-title">Köp</span> <span class="cart-nr">#${state.nextReceiptNr}</span></div><div class="cart-head-btns">${lines.length ? '<button class="btn ghost small" data-action="clear-cart">Töm</button>' : ''}<button class="btn ghost small cart-close" data-action="close-cart">Stäng</button></div></div>
+  <div class="cart-lines">${rows || '<div class="empty small">Tryck på en produkt för att lägga till den i köpet.</div>'}</div>
+  <div class="cart-foot">
+    <div class="cart-tools"><button class="btn small" data-action="custom">Eget belopp</button><button class="btn small ${t.discount ? 'is-on' : ''}" data-action="discount" ${lines.length ? '' : 'disabled'}>${t.discount ? `Rabatt −${kr(t.discount.amount)}` : 'Rabatt'}</button></div>
+    ${t.discount ? `<div class="cart-sub"><span>Summa</span><span>${kr(t.gross)}</span></div><div class="cart-sub"><span>Rabatt${t.discount.type === 'procent' ? ` ${t.discount.value} %` : ''}</span><span>−${kr(t.discount.amount)}</span></div>` : ''}
+    <div class="cart-total"><span>Att betala</span><b>${kr(t.total)}</b></div>
+    <div class="pay-row"><button class="btn pay swish" data-action="pay-swish" ${lines.length ? '' : 'disabled'}>Swish</button><button class="btn pay cash" data-action="pay-cash" ${lines.length ? '' : 'disabled'}>Kontant</button></div>
+  </div>`;
+}
+function updateCart() {
+  const pane = $('#cart-pane'); if (!pane) return;
+  pane.innerHTML = cartInner();
+  const bar = $('#cart-bar'); if (bar) bar.outerHTML = cartBarHtml();
+  const inCart = cartQtyMap();
+  $$('.tile').forEach((tile) => {
+    const qty = inCart.get(tile.dataset.id); let badge = tile.querySelector('.tile-qty');
+    if (qty) { if (!badge) { badge = document.createElement('span'); badge.className = 'tile-qty'; tile.appendChild(badge); } badge.textContent = qty; }
+    else if (badge) badge.remove();
+  });
+}
+function updateGrid() { const w = $('#grid-wrap'); if (w) w.innerHTML = gridHtml(); }
+function addToCart(id) {
+  const p = state.products.find((x) => x.id === id); if (!p) return;
+  const line = state.cart.lines.find((l) => l.productId === id && l.price === p.price);
+  if (line) line.qty += 1; else state.cart.lines.push({ productId: id, name: p.name, price: p.price, vat: p.vat, qty: 1 });
+  save(); updateCart();
+}
+function setCartOpen(open) { ui.cartOpen = open; const k = $('#kassa'); if (k) k.classList.toggle('cart-open', open); document.body.classList.toggle('cart-open', open); }
+
+// --- Kvitton ---
+function receiptRow(r) {
+  const items = r.lines.map((l) => (l.qty > 1 ? l.qty + ' × ' : '') + esc(l.name)).join(', ');
+  return `<button class="row" data-action="show-receipt" data-id="${r.id}"><span class="row-nr">#${r.nr}</span><span class="row-main"><b>${timeOf(r.ts)}</b> · ${items}</span><span class="row-side"><span class="badge ${r.payment}">${paymentName(r.payment)}</span>${r.status === 'makulerad' ? '<span class="badge void">Makulerad</span>' : ''}<b class="row-sum ${r.status === 'makulerad' ? 'strike' : ''}">${kr(r.total)}</b></span></button>`;
+}
+function renderKvitton() {
+  const q = ui.kvittoSearch.trim().toLowerCase();
+  let list = state.receipts.slice().sort((a, b) => b.ts.localeCompare(a.ts));
+  if (!ui.kvittoAll) list = list.filter((r) => r.day === ui.kvittoDay);
+  if (q) list = list.filter((r) => String(r.nr) === q.replace('#', '') || r.lines.some((l) => l.name.toLowerCase().includes(q)));
+  const groups = new Map(); list.forEach((r) => { if (!groups.has(r.day)) groups.set(r.day, []); groups.get(r.day).push(r); });
+  const html = [...groups.entries()].map(([day, rs]) => { const ok = rs.filter((r) => r.status === 'ok'); return `<div class="group"><div class="group-head"><b>${esc(fmtDay(day))}</b><span>${ok.length} ${ok.length === 1 ? 'kvitto' : 'kvitton'} · ${kr(sum(ok, (r) => r.total))}</span></div><div class="list">${rs.map(receiptRow).join('')}</div></div>`; }).join('');
+  return `<div class="page-head"><h1>Kvitton</h1><div class="toolbar">
+      <input type="date" class="input" value="${ui.kvittoDay}" data-role="kvitto-day" ${ui.kvittoAll ? 'disabled' : ''} aria-label="Datum">
+      <label class="check"><input type="checkbox" data-role="kvitto-all" ${ui.kvittoAll ? 'checked' : ''}> Alla dagar</label>
+      <input type="search" class="input" placeholder="Sök kvittonr eller produkt" value="${esc(ui.kvittoSearch)}" data-role="kvitto-search" aria-label="Sök kvitto" autocomplete="off">
+    </div></div>
+    ${html || `<div class="empty">${state.receipts.length ? 'Inga kvitton matchar.' : 'Inga kvitton ännu. De sparas här automatiskt när du slutför ett köp.'}</div>`}`;
+}
+function receiptHtml(r) {
+  const s = state.settings;
+  const meta = [s.orgnr ? `Org.nr ${esc(s.orgnr)}` : '', s.adress ? esc(s.adress) : ''].filter(Boolean).join(' · ');
+  return `<div class="paper ${r.status === 'makulerad' ? 'is-void' : ''}">
+    <div class="paper-brand"><img src="img/logo.png" alt="${esc(s.foretag)}"></div>
+    ${meta ? `<div class="paper-meta">${meta}</div>` : ''}
+    <div class="paper-meta">Kvitto #${r.nr} · ${r.day} ${timeOf(r.ts)}</div>
+    <hr>
+    ${r.lines.map((l) => `<div class="paper-line"><span>${l.qty} × ${esc(l.name)}</span><span>${nf.format(r2(l.price * l.qty))}</span></div>`).join('')}
+    ${r.discount ? `<div class="paper-line"><span>Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}${r.discount.reason ? `, ${esc(r.discount.reason)}` : ''}</span><span>−${nf.format(r.discount.amount)}</span></div>` : ''}
+    <hr>
+    <div class="paper-line paper-total"><span>Att betala</span><span>${kr(r.total)}</span></div>
+    ${r.vatLines.map((v) => `<div class="paper-line paper-vat"><span>Varav moms ${v.rate} % (netto ${nf.format(v.net)})</span><span>${nf.format(v.vat)}</span></div>`).join('')}
+    <div class="paper-line"><span>Betalsätt</span><span>${paymentName(r.payment)}</span></div>
+    ${r.payment === 'kontant' ? `<div class="paper-line"><span>Mottaget</span><span>${nf.format(r.received)}</span></div><div class="paper-line"><span>Växel</span><span>${nf.format(r.change)}</span></div>` : ''}
+    ${r.status === 'makulerad' ? `<div class="paper-void">Makulerat ${r.voided ? r.voided.ts.slice(0, 10) + ' ' + timeOf(r.voided.ts) : ''}${r.voided && r.voided.reason ? `<br><small>${esc(r.voided.reason)}</small>` : ''}</div>` : ''}
+    <div class="paper-thanks">${esc(s.kvittoText)}</div>
+  </div>`;
+}
+
+// --- Dagsavslut ---
+function daySummary(day) {
+  const all = state.receipts.filter((r) => r.day === day).sort((a, b) => a.ts.localeCompare(b.ts));
+  const ok = all.filter((r) => r.status === 'ok'); const voided = all.filter((r) => r.status !== 'ok');
+  const total = r2(sum(ok, (r) => r.total));
+  const swish = r2(sum(ok.filter((r) => r.payment === 'swish'), (r) => r.total));
+  const cash = r2(sum(ok.filter((r) => r.payment === 'kontant'), (r) => r.total));
+  const vat = new Map();
+  ok.forEach((r) => r.vatLines.forEach((v) => { const c = vat.get(v.rate) || { rate: v.rate, net: 0, vat: 0, gross: 0 }; c.net = r2(c.net + v.net); c.vat = r2(c.vat + v.vat); c.gross = r2(c.gross + v.gross); vat.set(v.rate, c); }));
+  const prod = new Map();
+  ok.forEach((r) => r.lines.forEach((l) => { const c = prod.get(l.name) || { name: l.name, qty: 0, sum: 0 }; c.qty += l.qty; c.sum = r2(c.sum + l.price * l.qty); prod.set(l.name, c); }));
+  return {
+    day, count: ok.length, total, swish, cash,
+    vat: [...vat.values()].sort((a, b) => b.rate - a.rate),
+    discounts: r2(sum(ok.filter((r) => r.discount), (r) => r.discount.amount)),
+    voidedCount: voided.length, voidedSum: r2(sum(voided, (r) => r.total)),
+    products: [...prod.values()].sort((a, b) => b.sum - a.sum),
+    first: ok.length ? timeOf(ok[0].ts) : '', last: ok.length ? timeOf(ok[ok.length - 1].ts) : ''
+  };
+}
+function diffClass(d) { return d === null ? '' : d === 0 ? 'diff-good' : Math.abs(d) <= 20 ? 'diff-warn' : 'diff-bad'; }
+function renderDagsavslut() {
+  const day = ui.closeDay; const s = daySummary(day); const closing = state.closings.find((c) => c.day === day);
+  const float = closing ? closing.float : state.settings.vaxelkassa;
+  const counted = closing && closing.counted !== null && closing.counted !== undefined ? closing.counted : '';
+  const expected = r2(Number(float || 0) + s.cash);
+  const diff = counted === '' ? null : r2(Number(counted) - expected);
+  const stat = (label, value, cls = '', extra = '') => `<div class="stat ${cls}"><span class="stat-label">${label}</span><span class="stat-value">${value}${extra ? ` <small>${extra}</small>` : ''}</span></div>`;
+  return `<div class="page-head"><h1>Dagsavslut</h1><div class="toolbar"><button class="btn small" data-action="day-prev" aria-label="Föregående dag">‹</button><input type="date" class="input" value="${day}" data-role="close-day" aria-label="Datum"><button class="btn small" data-action="day-next" aria-label="Nästa dag">›</button></div></div>
+  <p class="lead">${esc(fmtDay(day))}${s.count ? ` · första köp ${s.first}, sista ${s.last}` : ' · inga köp registrerade'}</p>
+  <div class="stats">
+    ${stat('Försäljning', kr(s.total))}
+    ${stat('Kvitton', s.count, '', s.voidedCount ? `+ ${s.voidedCount} makulerade` : '')}
+    ${stat('Swish', kr(s.swish), 'swish')}
+    ${stat('Kontant', kr(s.cash), 'cash')}
+  </div>
+  <div class="two-col">
+    <div class="card"><h2>Moms</h2>
+      <div class="table-wrap"><table class="table"><thead><tr><th>Sats</th><th class="num">Netto</th><th class="num">Moms</th><th class="num">Brutto</th></tr></thead><tbody>
+      ${s.vat.length ? s.vat.map((v) => `<tr><td>${v.rate} %</td><td class="num">${nf.format(v.net)}</td><td class="num">${nf.format(v.vat)}</td><td class="num">${nf.format(v.gross)}</td></tr>`).join('') : '<tr><td colspan="4" class="muted">Inga köp</td></tr>'}
+      ${s.vat.length > 1 ? `<tr class="total"><td>Totalt</td><td class="num">${nf.format(sum(s.vat, (v) => v.net))}</td><td class="num">${nf.format(sum(s.vat, (v) => v.vat))}</td><td class="num">${nf.format(s.total)}</td></tr>` : ''}
+      </tbody></table></div>
+      <div class="kv" style="margin-top:10px"><span>Rabatter givna</span><b>${kr(s.discounts)}</b></div>
+      <div class="kv"><span>Makulerade kvitton</span><b>${s.voidedCount} st · ${kr(s.voidedSum)}</b></div>
+    </div>
+    <div class="card"><h2>Kontantkassa</h2>
+      <div class="field-row">
+        <label class="field"><span>Växelkassa vid start</span><input class="input num" type="number" inputmode="numeric" min="0" step="1" value="${esc(float)}" data-role="float"></label>
+        <label class="field"><span>Räknat i kassan vid stängning</span><input class="input num" type="number" inputmode="numeric" min="0" step="1" value="${esc(counted)}" data-role="counted" placeholder="Räkna sedlar och mynt"></label>
+      </div>
+      <div class="kv"><span>Kontantförsäljning</span><b>${kr(s.cash)}</b></div>
+      <div class="kv"><span>Förväntat i kassan</span><b id="expected">${kr(expected)}</b></div>
+      <div class="kv big"><span>Differens</span><b id="diff" class="${diffClass(diff)}">${diff === null ? '–' : (diff > 0 ? '+' : '') + kr(diff)}</b></div>
+      <label class="field" style="margin-top:10px"><span>Anteckning</span><textarea class="input" data-role="note" placeholder="t.ex. plats, väder, vad som sålde slut">${esc(closing ? closing.note : '')}</textarea></label>
+      <div class="btn-row"><button class="btn primary" data-action="save-closing">${closing ? 'Uppdatera dagsavslut' : 'Spara dagsavslut'}</button>${closing ? `<span class="fine" style="align-self:center">Sparat ${closing.savedAt.slice(0, 10)} ${timeOf(closing.savedAt)}</span>` : ''}</div>
+    </div>
+  </div>
+  <div class="card"><h2>Sålda produkter</h2>
+    ${s.products.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Produkt</th><th class="num">Antal</th><th class="num">Summa</th></tr></thead><tbody>${s.products.map((p) => `<tr><td>${esc(p.name)}</td><td class="num">${p.qty}</td><td class="num">${nf.format(p.sum)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Inga sålda produkter den här dagen.</p>'}
+  </div>
+  <div class="card"><h2>Export</h2><p class="fine">Filerna öppnas i Excel eller Numbers. Kvittoraderna är underlaget till bokföringen.</p>
+    <div class="btn-row"><button class="btn" data-action="export-closing">Dagsavslut (CSV)</button><button class="btn" data-action="export-lines">Kvittorader för dagen (CSV)</button><button class="btn" data-action="export-all-lines">Alla kvittorader (CSV)</button></div>
+  </div>
+  <div class="card"><h2>Tidigare dagsavslut</h2>
+    ${state.closings.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Dag</th><th class="num">Kvitton</th><th class="num">Försäljning</th><th class="num">Swish</th><th class="num">Kontant</th><th class="num">Differens</th></tr></thead><tbody>${state.closings.slice().sort((a, b) => b.day.localeCompare(a.day)).map((c) => `<tr><td><button class="btn ghost small" data-action="open-day" data-id="${c.day}">${c.day}</button></td><td class="num">${c.snapshot.count}</td><td class="num">${nf.format(c.snapshot.total)}</td><td class="num">${nf.format(c.snapshot.swish)}</td><td class="num">${nf.format(c.snapshot.cash)}</td><td class="num ${diffClass(c.diff)}">${c.diff === null ? '–' : (c.diff > 0 ? '+' : '') + nf.format(c.diff)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Inga sparade dagsavslut ännu.</p>'}
+  </div>`;
+}
+function updateCashCalc() {
+  const s = daySummary(ui.closeDay);
+  const float = parseNum($('[data-role=float]')?.value) || 0; const countedRaw = $('[data-role=counted]')?.value ?? '';
+  const expected = r2(float + s.cash); const counted = parseNum(countedRaw);
+  const diff = countedRaw === '' || counted === null ? null : r2(counted - expected);
+  const e = $('#expected'); if (e) e.textContent = kr(expected);
+  const d = $('#diff'); if (d) { d.textContent = diff === null ? '–' : (diff > 0 ? '+' : '') + kr(diff); d.className = diffClass(diff); }
+}
+function saveClosing() {
+  const day = ui.closeDay; const s = daySummary(day);
+  const float = parseNum($('[data-role=float]')?.value) || 0; const countedRaw = $('[data-role=counted]')?.value ?? '';
+  const counted = countedRaw === '' ? null : parseNum(countedRaw);
+  const expected = r2(float + s.cash); const diff = counted === null ? null : r2(counted - expected);
+  const note = $('[data-role=note]')?.value.trim() || '';
+  let c = state.closings.find((x) => x.day === day);
+  if (!c) { c = { id: uid(), day }; state.closings.push(c); }
+  Object.assign(c, { savedAt: new Date().toISOString(), float, counted, expected, diff, note, snapshot: { count: s.count, total: s.total, swish: s.swish, cash: s.cash, vat: s.vat, discounts: s.discounts, voidedCount: s.voidedCount, voidedSum: s.voidedSum } });
+  save(); toast('Dagsavslut sparat'); render();
+}
+
+// --- CSV ---
+const BOM = String.fromCharCode(0xFEFF);
+const csvNum = (n) => String(r2(n)).replace('.', ',');
+const csvRow = (cells) => cells.map((c) => { const s = String(c ?? ''); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';');
+function closingCsv(day) {
+  const s = daySummary(day); const c = state.closings.find((x) => x.day === day);
+  const rows = [
+    [state.settings.foretag, 'Dagsavslut', day], [],
+    ['Antal kvitton', s.count], ['Försäljning totalt', csvNum(s.total)], ['Swish', csvNum(s.swish)], ['Kontant', csvNum(s.cash)],
+    ['Rabatter givna', csvNum(s.discounts)], ['Makulerade kvitton', s.voidedCount, csvNum(s.voidedSum)], [],
+    ['Momssats', 'Netto', 'Moms', 'Brutto'], ...s.vat.map((v) => [`${v.rate} %`, csvNum(v.net), csvNum(v.vat), csvNum(v.gross)]), [],
+    ['Växelkassa vid start', c ? csvNum(c.float) : ''], ['Kontantförsäljning', csvNum(s.cash)], ['Förväntat i kassan', c ? csvNum(c.expected) : ''],
+    ['Räknat', c && c.counted !== null ? csvNum(c.counted) : ''], ['Differens', c && c.diff !== null ? csvNum(c.diff) : ''], ['Anteckning', c ? c.note : ''], [],
+    ['Produkt', 'Antal', 'Summa'], ...s.products.map((p) => [p.name, p.qty, csvNum(p.sum)])
+  ];
+  return BOM + rows.map(csvRow).join('\r\n');
+}
+function linesCsv(receipts) {
+  const rows = [['Kvittonr', 'Datum', 'Tid', 'Produkt', 'Antal', 'Pris', 'Summa', 'Moms %', 'Rabatt på kvittot', 'Kvittototal', 'Betalsätt', 'Status']];
+  receipts.slice().sort((a, b) => a.ts.localeCompare(b.ts)).forEach((r) => r.lines.forEach((l) => rows.push([r.nr, r.day, timeOf(r.ts), l.name, l.qty, csvNum(l.price), csvNum(l.price * l.qty), l.vat, r.discount ? csvNum(r.discount.amount) : '0', csvNum(r.total), paymentName(r.payment), r.status === 'ok' ? 'OK' : 'Makulerad'])));
+  return BOM + rows.map(csvRow).join('\r\n');
+}
+function productsCsv() {
+  const rows = [['Kategori', 'Produkt', 'Pris', 'Moms', 'Aktiv']];
+  state.categories.forEach((c) => state.products.filter((p) => p.categoryId === c.id).forEach((p) => rows.push([c.name, p.name, csvNum(p.price), p.vat, p.active === false ? 'nej' : 'ja'])));
+  state.products.filter((p) => !catOf(p.categoryId)).forEach((p) => rows.push(['', p.name, csvNum(p.price), p.vat, p.active === false ? 'nej' : 'ja']));
+  return BOM + rows.map(csvRow).join('\r\n');
+}
+
+// --- Produkter ---
+function renderProdukter() {
+  const banner = state.meta.sample ? `<div class="notice">Det här är exempelprodukter för att visa hur kassan fungerar. Importera din egen lista från Word eller ändra dem här.<button class="btn small" data-action="dismiss-sample">Dölj</button></div>` : '';
+  const prodRow = (p) => `<div class="prod-row ${p.active === false ? 'is-off' : ''}"><span class="row-emoji">${esc(p.emoji || '')}</span><button class="prod-main" data-action="edit-product" data-id="${p.id}"><span>${esc(p.name)}${p.active === false ? ' <span class="badge off">Dold</span>' : ''}${p.vat !== state.settings.momsStandard ? ` <span class="badge vat">moms ${p.vat} %</span>` : ''}</span></button><span class="prod-price">${kr(p.price)}</span><span class="mini-btns"><button class="mini" data-action="prod-up" data-id="${p.id}" aria-label="Flytta upp">↑</button><button class="mini" data-action="prod-down" data-id="${p.id}" aria-label="Flytta ner">↓</button></span></div>`;
+  const cards = state.categories.map((c, i) => {
+    const ps = state.products.filter((p) => p.categoryId === c.id);
+    return `<div class="card cat-card"><div class="cat-head" style="--chip-ink:var(--cat-${c.color}-ink)">${catArt(c, 'cat-art') || `<i class="dot" style="background:var(--cat-${c.color})"></i>`}<h2>${esc(c.name)}</h2><span class="muted">${ps.length} st</span><span class="cat-btns"><button class="mini" data-action="cat-up" data-id="${c.id}" aria-label="Flytta kategorin upp" ${i === 0 ? 'disabled' : ''}>↑</button><button class="mini" data-action="cat-down" data-id="${c.id}" aria-label="Flytta kategorin ner" ${i === state.categories.length - 1 ? 'disabled' : ''}>↓</button><button class="btn ghost small" data-action="edit-category" data-id="${c.id}">Ändra</button></span></div>
+      <div class="list">${ps.map(prodRow).join('') || '<div class="empty small">Inga produkter i den här kategorin.</div>'}</div>
+      <div class="btn-row" style="margin-top:10px"><button class="btn ghost small" data-action="new-product" data-id="${c.id}">+ Lägg till i ${esc(c.name)}</button></div></div>`;
+  }).join('');
+  const orphans = state.products.filter((p) => !catOf(p.categoryId));
+  return `<div class="page-head"><h1>Produkter</h1><div class="toolbar"><button class="btn primary" data-action="import">Importera från fil</button><button class="btn" data-action="new-product">Ny produkt</button><button class="btn" data-action="new-category">Ny kategori</button><button class="btn ghost" data-action="export-products">Exportera (CSV)</button></div></div>
+  ${banner}${cards}
+  ${orphans.length ? `<div class="card cat-card"><div class="cat-head"><h2>Utan kategori</h2></div><div class="list">${orphans.map(prodRow).join('')}</div></div>` : ''}
+  ${state.categories.length ? '' : '<div class="empty">Inga kategorier ännu. Skapa en kategori eller importera en produktlista.</div>'}`;
+}
+function moveInArray(arr, idx, dir) { const j = idx + dir; if (idx < 0 || j < 0 || j >= arr.length) return false; [arr[idx], arr[j]] = [arr[j], arr[idx]]; return true; }
+function moveProduct(id, dir) {
+  const p = state.products.find((x) => x.id === id); if (!p) return;
+  const siblings = state.products.filter((x) => x.categoryId === p.categoryId); const i = siblings.indexOf(p); const j = i + dir;
+  if (j < 0 || j >= siblings.length) return;
+  const a = state.products.indexOf(siblings[i]); const b = state.products.indexOf(siblings[j]);
+  [state.products[a], state.products[b]] = [state.products[b], state.products[a]];
+  save(); render();
+}
+function productDialog(id, presetCat) {
+  const existing = id ? state.products.find((x) => x.id === id) : null;
+  const p = existing || { name: '', price: '', vat: state.settings.momsStandard, categoryId: presetCat || (state.categories[0] || {}).id || '', emoji: '', active: true };
+  const catOpts = state.categories.map((c) => `<option value="${c.id}" ${c.id === p.categoryId ? 'selected' : ''}>${esc(c.name)}</option>`).join('') + '<option value="__new">+ Ny kategori…</option>';
+  const m = openModal({ title: existing ? 'Ändra produkt' : 'Ny produkt', body: `
+    <label class="field"><span>Namn</span><input class="input" id="p-name" value="${esc(p.name)}" placeholder="t.ex. Chocolate chip" autocomplete="off"></label>
+    <div class="field-row">
+      <label class="field"><span>Pris (kr, inkl. moms)</span><input class="input num" id="p-price" type="number" inputmode="decimal" min="0" step="1" value="${esc(p.price)}"></label>
+      <label class="field"><span>Moms</span><select class="input" id="p-vat">${VAT_RATES.map((v) => `<option value="${v}" ${v === p.vat ? 'selected' : ''}>${v} %</option>`).join('')}</select></label>
+    </div>
+    <label class="field"><span>Kategori</span><select class="input" id="p-cat">${catOpts}</select></label>
+    <label class="field hidden" id="p-newcat-wrap"><span>Namn på ny kategori</span><input class="input" id="p-newcat" placeholder="t.ex. Cupcakes"></label>
+    <div class="field-row">
+      <label class="field"><span>Ikon (valfri emoji)</span><input class="input" id="p-emoji" value="${esc(p.emoji || '')}" placeholder="🍪" maxlength="4"></label>
+      <label class="check" style="margin-top:22px"><input type="checkbox" id="p-active" ${p.active !== false ? 'checked' : ''}> Visas i kassan</label>
+    </div>`,
+    footer: `${existing ? '<button class="btn danger-ghost" data-del>Ta bort</button>' : ''}<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Spara</button>` });
+  const el = m.el;
+  $('#p-cat', el).addEventListener('change', (e) => { $('#p-newcat-wrap', el).classList.toggle('hidden', e.target.value !== '__new'); if (e.target.value === '__new') $('#p-newcat', el).focus(); });
+  $('[data-ok]', el).addEventListener('click', () => {
+    const name = $('#p-name', el).value.trim(); const price = parseNum($('#p-price', el).value);
+    if (!name) { toast('Skriv ett namn på produkten', 'bad'); return; }
+    if (price === null || price < 0) { toast('Ange ett pris', 'bad'); return; }
+    let categoryId = $('#p-cat', el).value;
+    if (categoryId === '__new') { const cn = $('#p-newcat', el).value.trim(); if (!cn) { toast('Skriv ett namn på kategorin', 'bad'); return; } categoryId = ensureCategory(cn); }
+    const data = { name, price: r2(price), vat: Number($('#p-vat', el).value), categoryId, emoji: $('#p-emoji', el).value.trim(), active: $('#p-active', el).checked };
+    if (existing) Object.assign(existing, data); else state.products.push({ id: uid(), ...data });
+    state.meta.sample = false; save(); m.close(); toast('Produkt sparad'); render();
+  });
+  $('[data-del]', el)?.addEventListener('click', async () => {
+    m.close();
+    if (await confirmDialog({ title: 'Ta bort produkt', text: `Vill du ta bort <b>${esc(existing.name)}</b>? Gamla kvitton påverkas inte.`, ok: 'Ta bort', danger: true })) {
+      state.products = state.products.filter((x) => x.id !== existing.id); state.meta.sample = false; save(); toast('Produkt borttagen'); render();
+    }
+  });
+  setTimeout(() => $('#p-name', el).focus(), 50);
+}
+function ensureCategory(name) {
+  const found = state.categories.find((c) => c.name.toLowerCase() === name.toLowerCase()); if (found) return found.id;
+  const g = guessIcon(name);
+  const c = { id: uid(), name, color: CAT_COLORS[state.categories.length % CAT_COLORS.length], image: g ? { kind: 'icon', icon: g } : null }; state.categories.push(c); return c.id;
+}
+function categoryDialog(id) {
+  const existing = id ? state.categories.find((c) => c.id === id) : null;
+  const c = existing || { name: '', color: CAT_COLORS[state.categories.length % CAT_COLORS.length] };
+  let color = c.color; let image = existing ? (existing.image || null) : null; let manual = !!existing;
+  const artOpts = () => `<button type="button" class="art-opt ${!image ? 'is-active' : ''}" data-art="none"><span class="art-none">–</span>Ingen</button>`
+    + Object.keys(ART).map((k) => `<button type="button" class="art-opt ${image && image.kind === 'icon' && image.icon === k ? 'is-active' : ''}" data-art="${k}">${svgArt(k)}${esc(ART_LABELS[k])}</button>`).join('')
+    + `<label class="art-opt ${image && image.kind === 'photo' ? 'is-active' : ''}" id="art-upload">${image && image.kind === 'photo' ? `<img src="${photoSrc(image.data)}" alt="">` : '<span class="art-plus">+</span>'}Egen bild<input type="file" accept="image/*"></label>`;
+  const m = openModal({ title: existing ? 'Ändra kategori' : 'Ny kategori', cls: 'wide', body: `
+    <label class="field"><span>Namn</span><input class="input" id="c-name" value="${esc(c.name)}" placeholder="t.ex. Cookies" autocomplete="off"></label>
+    <div class="field"><span>Färg i kassan</span><div class="swatches">${CAT_COLORS.map((col) => `<button type="button" class="swatch ${col === color ? 'is-active' : ''}" data-color="${col}" style="background:var(--cat-${col})" aria-label="${col}"></button>`).join('')}</div></div>
+    <div class="field"><span>Bild i kassan</span><div class="art-grid" id="art-grid">${artOpts()}</div><p class="hint">Bilden visas på kategorins produkter i kassan. Med Egen bild kan du ta ett foto eller välja ur bildbiblioteket. Den sparas i liten storlek i appen.</p></div>`,
+    footer: `${existing ? '<button class="btn danger-ghost" data-del>Ta bort</button>' : ''}<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Spara</button>` });
+  const el = m.el;
+  const bindArt = () => {
+    $$('#art-grid [data-art]', el).forEach((b) => b.addEventListener('click', () => { manual = true; const k = b.dataset.art; image = k === 'none' ? null : { kind: 'icon', icon: k }; rerenderArt(); }));
+    $('#art-upload input', el).addEventListener('change', async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try { image = { kind: 'photo', data: await readImageFile(f) }; manual = true; rerenderArt(); }
+      catch (err) { toast(err.message || 'Kunde inte läsa bilden', 'bad'); }
+    });
+  };
+  const rerenderArt = () => { $('#art-grid', el).innerHTML = artOpts(); bindArt(); };
+  bindArt();
+  $('#c-name', el).addEventListener('input', (e) => { if (manual) return; const g = guessIcon(e.target.value); image = g ? { kind: 'icon', icon: g } : null; rerenderArt(); });
+  $$('.swatch', el).forEach((b) => b.addEventListener('click', () => { color = b.dataset.color; $$('.swatch', el).forEach((x) => x.classList.toggle('is-active', x === b)); }));
+  $('[data-ok]', el).addEventListener('click', () => {
+    const name = $('#c-name', el).value.trim(); if (!name) { toast('Skriv ett namn på kategorin', 'bad'); return; }
+    if (existing) Object.assign(existing, { name, color, image }); else state.categories.push({ id: uid(), name, color, image });
+    state.meta.sample = false; save(); m.close(); render();
+  });
+  $('[data-del]', el)?.addEventListener('click', async () => {
+    m.close(); const n = state.products.filter((p) => p.categoryId === existing.id).length;
+    if (await confirmDialog({ title: 'Ta bort kategori', text: n ? `Kategorin har ${n} produkter. De tas också bort. Gamla kvitton påverkas inte.` : 'Vill du ta bort kategorin?', ok: 'Ta bort', danger: true })) {
+      state.products = state.products.filter((p) => p.categoryId !== existing.id); state.categories = state.categories.filter((x) => x.id !== existing.id);
+      if (ui.cat === existing.id) ui.cat = 'all'; state.meta.sample = false; save(); render();
+    }
+  });
+  setTimeout(() => $('#c-name', el).focus(), 50);
+}
+
+// --- Import ---
+const scriptCache = {};
+function loadScript(src) {
+  return scriptCache[src] || (scriptCache[src] = new Promise((resolve, reject) => {
+    const s = document.createElement('script'); s.src = src; s.onload = resolve;
+    s.onerror = () => { delete scriptCache[src]; reject(new Error('Kunde inte ladda ' + src)); };
+    document.head.appendChild(s);
+  }));
+}
+const PRICE_RE = /^(.+?)[\s\-–—:.,;|\t]*(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:kr|:-|sek|kronor)?\s*[.!]?$/i;
+function matchProductLine(text) {
+  const t = text.replace(/[“”"']+$/g, '').trim(); const m = t.match(PRICE_RE); if (!m) return null;
+  const name = m[1].replace(/[\s\-–—:.,;|]+$/g, '').trim(); const price = parseNum(m[2]);
+  if (!name || price === null) return null; return { name, price };
+}
+function parseVat(s) { const n = parseInt(String(s || '').replace(/[^\d]/g, ''), 10); return VAT_RATES.includes(n) ? n : null; }
+function productsFromTable(rows) {
+  const clean = rows.map((r) => r.map((c) => String(c || '').replace(/\s+/g, ' ').trim())).filter((r) => r.some(Boolean));
+  if (!clean.length) return [];
+  const head = clean[0].map((c) => c.toLowerCase());
+  const find = (re) => head.findIndex((h) => re.test(h));
+  let nameIdx = find(/produkt|namn|vara|artikel/), priceIdx = find(/pris|kr|belopp/), catIdx = find(/kategori|grupp|typ|sort/), vatIdx = find(/moms/), emojiIdx = find(/ikon|emoji/);
+  let body = clean;
+  if (nameIdx >= 0 && priceIdx >= 0) body = clean.slice(1);
+  else {
+    const cols = Math.max(...clean.map((r) => r.length));
+    const numeric = (i) => { const vals = clean.map((r) => r[i]).filter(Boolean); return vals.length && vals.filter((v) => /^\s*\d+([.,]\d{1,2})?\s*(kr|:-|sek)?\s*$/i.test(v)).length >= vals.length * 0.6; };
+    priceIdx = -1; for (let i = 0; i < cols; i++) if (numeric(i)) { priceIdx = i; break; }
+    if (priceIdx < 0) return [];
+    const textCols = []; for (let i = 0; i < cols; i++) if (i !== priceIdx && !numeric(i)) textCols.push(i);
+    if (textCols.length >= 2) { catIdx = textCols[0]; nameIdx = textCols[1]; } else { nameIdx = textCols[0] ?? -1; catIdx = -1; }
+    vatIdx = -1; for (let i = priceIdx + 1; i < cols; i++) if (i !== nameIdx && numeric(i)) { vatIdx = i; break; }
+    if (nameIdx < 0) return [];
+  }
+  const out = []; let lastCat = '';
+  for (const r of body) {
+    const name = r[nameIdx] || ''; const price = parseNum((r[priceIdx] || '').replace(/[^\d.,]/g, ''));
+    if (!name || price === null) continue;
+    const cat = catIdx >= 0 && r[catIdx] ? r[catIdx] : lastCat; if (catIdx >= 0 && r[catIdx]) lastCat = r[catIdx];
+    out.push({ name, price: r2(price), category: cat, vat: vatIdx >= 0 ? parseVat(r[vatIdx]) : null, emoji: emojiIdx >= 0 ? (r[emojiIdx] || '') : '' });
+  }
+  return out;
+}
+function productsFromLines(paras) {
+  const out = []; let cat = '';
+  for (const p of paras) {
+    const t = p.text.replace(/\s+/g, ' ').trim(); if (!t) continue;
+    const m = !p.heading && t.length <= 70 ? matchProductLine(t) : null;
+    if (m) out.push({ name: m.name, price: r2(m.price), category: cat, vat: null, emoji: '' });
+    else if (!/\d/.test(t) && t.length <= 40) cat = t.replace(/[:\-–—]+$/g, '').trim();
+  }
+  return out;
+}
+function parseProductText(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean); if (!lines.length) return [];
+  const sep = [';', '\t', ','].find((s) => lines.filter((l) => l.includes(s)).length >= lines.length * 0.6);
+  if (sep) return productsFromTable(lines.map((l) => l.split(sep)));
+  return productsFromLines(lines.map((l) => ({ text: l, heading: false })));
+}
+async function parseDocx(buf) {
+  await loadScript('vendor/jszip.min.js');
+  const zip = await JSZip.loadAsync(buf); const file = zip.file('word/document.xml');
+  if (!file) throw new Error('Filen ser inte ut som ett Word-dokument.');
+  const xml = await file.async('string'); const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const body = doc.getElementsByTagNameNS(NS, 'body')[0]; if (!body) throw new Error('Kunde inte läsa dokumentets innehåll.');
+  const textOf = (el) => [...el.getElementsByTagNameNS(NS, 't')].map((t) => t.textContent).join('').replace(/\s+/g, ' ').trim();
+  const isHeading = (p) => {
+    const st = p.getElementsByTagNameNS(NS, 'pStyle')[0]; const val = st ? (st.getAttribute('w:val') || st.getAttributeNS(NS, 'val') || '') : '';
+    if (/heading|rubrik|title|titel/i.test(val) || p.getElementsByTagNameNS(NS, 'outlineLvl').length) return true;
+    const runs = [...p.getElementsByTagNameNS(NS, 'r')].filter((r) => textOf(r)); return runs.length > 0 && runs.every((r) => r.getElementsByTagNameNS(NS, 'b').length > 0);
+  };
+  const tables = []; const paras = [];
+  for (const el of body.children) {
+    if (el.localName === 'tbl') tables.push([...el.getElementsByTagNameNS(NS, 'tr')].map((tr) => [...tr.children].filter((c) => c.localName === 'tc').map(textOf)));
+    else if (el.localName === 'p') paras.push({ text: textOf(el), heading: isHeading(el) });
+  }
+  let items = []; tables.forEach((t) => items.push(...productsFromTable(t)));
+  if (!items.length) items = productsFromLines(paras);
+  return items;
+}
+async function parseProductFile(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.docx')) return parseDocx(await file.arrayBuffer());
+  if (name.endsWith('.doc')) throw new Error('Gamla .doc-filer stöds inte. Spara om filen som .docx i Word.');
+  return parseProductText(await file.text());
+}
+function normalizeItems(items) {
+  const seen = new Map();
+  for (const it of items) {
+    const name = it.name.trim(); if (!name) continue;
+    const category = (it.category || '').trim() || 'Övrigt'; const key = (category + '|' + name).toLowerCase();
+    seen.set(key, { name, price: it.price, category, vat: it.vat ?? null, emoji: it.emoji || '' });
+  }
+  return [...seen.values()];
+}
+function importDialog() {
+  const m = openModal({ title: 'Importera produkter', cls: 'wide', body: `
+    <p>Välj din produktlista som Word-fil (.docx). Det går också bra med CSV eller en vanlig textfil.</p>
+    <div class="drop"><b>Välj fil</b><input type="file" id="imp-file" accept=".docx,.csv,.txt,.text,text/plain,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></div>
+    <p class="hint">Så ska filen se ut: en tabell med kolumnerna <b>Kategori</b>, <b>Produkt</b> och <b>Pris</b> (och valfritt <b>Moms</b>). Eller en enkel lista med kategorinamnet på en egen rad och sedan en rad per produkt med priset sist, till exempel <i>Chocolate chip 35</i>.</p>
+    <p class="hint"><a href="Produktlista-mall.docx" download>Ladda ner Word-mallen</a> och fyll i den om du vill utgå från ett färdigt exempel.</p>
+    <label class="field" style="margin-top:14px"><span>…eller klistra in listan här</span><textarea class="input" id="imp-text" placeholder="Cookies
+Chocolate chip 35
+Red velvet 35
+Dryck
+Kaffe 25"></textarea></label>`,
+    footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Läs in</button>` });
+  const el = m.el;
+  const handle = async (items, label) => {
+    const list = normalizeItems(items);
+    if (!list.length) { toast('Hittade inga produkter med pris i ' + label, 'bad'); return; }
+    m.close(); importPreview(list);
+  };
+  $('#imp-file', el).addEventListener('change', async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try { await handle(await parseProductFile(f), f.name); } catch (err) { console.error(err); toast(err.message || 'Kunde inte läsa filen', 'bad'); }
+  });
+  $('[data-ok]', el).addEventListener('click', async () => {
+    const text = $('#imp-text', el).value; const f = $('#imp-file', el).files[0];
+    if (f) { try { await handle(await parseProductFile(f), f.name); } catch (err) { toast(err.message || 'Kunde inte läsa filen', 'bad'); } }
+    else if (text.trim()) await handle(parseProductText(text), 'texten');
+    else toast('Välj en fil eller klistra in en lista', 'bad');
+  });
+}
+function importPreview(items) {
+  const std = state.settings.momsStandard;
+  const m = openModal({ title: `${items.length} produkter hittades`, cls: 'wide', body: `
+    <div class="seg"><button class="seg-btn is-active" data-mode="merge">Lägg till och uppdatera</button><button class="seg-btn" data-mode="replace">Ersätt hela sortimentet</button></div>
+    <p class="hint" id="imp-mode-hint">Produkter med samma namn får nytt pris, nya produkter läggs till. Inget tas bort.</p>
+    <div class="table-wrap"><table class="table import-table"><thead><tr><th><input type="checkbox" id="imp-all" checked aria-label="Välj alla"></th><th>Kategori</th><th>Produkt</th><th class="num">Pris</th><th class="num">Moms</th></tr></thead><tbody>
+    ${items.map((it, i) => `<tr><td><input type="checkbox" data-i="${i}" checked></td><td>${esc(it.category)}</td><td>${esc(it.emoji ? it.emoji + ' ' : '')}${esc(it.name)}</td><td class="num">${kr(it.price)}</td><td class="num">${it.vat ?? std} %</td></tr>`).join('')}
+    </tbody></table></div>`,
+    footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Importera</button>` });
+  const el = m.el; let mode = 'merge';
+  $$('.seg-btn', el).forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; $$('.seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); $('#imp-mode-hint', el).textContent = mode === 'merge' ? 'Produkter med samma namn får nytt pris, nya produkter läggs till. Inget tas bort.' : 'Alla nuvarande produkter och kategorier tas bort och ersätts av listan. Gamla kvitton påverkas inte.'; }));
+  $('#imp-all', el).addEventListener('change', (e) => $$('tbody input[type=checkbox]', el).forEach((c) => { c.checked = e.target.checked; }));
+  $('[data-ok]', el).addEventListener('click', () => {
+    const chosen = $$('tbody input[type=checkbox]:checked', el).map((c) => items[+c.dataset.i]);
+    if (!chosen.length) { toast('Inga produkter valda', 'bad'); return; }
+    if (mode === 'replace') { state.products = []; state.categories = []; ui.cat = 'all'; }
+    let added = 0, updated = 0;
+    for (const it of chosen) {
+      const categoryId = ensureCategory(it.category); const vat = it.vat ?? std;
+      const existing = state.products.find((p) => p.name.toLowerCase() === it.name.toLowerCase() && (p.categoryId === categoryId || mode === 'merge'));
+      if (existing) { Object.assign(existing, { price: it.price, vat, categoryId }); if (it.emoji) existing.emoji = it.emoji; updated++; }
+      else { state.products.push({ id: uid(), name: it.name, price: it.price, vat, categoryId, emoji: it.emoji || '', active: true }); added++; }
+    }
+    state.meta.sample = false; save(); m.close(); toast(`${added} nya, ${updated} uppdaterade`); render();
+  });
+}
+
+// --- Inställningar ---
+function isStandalone() { return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
+function renderInstallningar() {
+  const s = state.settings;
+  const f = (key, label, opts = {}) => `<label class="field"><span>${label}</span><input class="input ${opts.cls || ''}" data-setting="${key}" value="${esc(s[key])}" ${opts.attrs || ''}></label>`;
+  return `<div class="page-head"><h1>Inställningar</h1></div>
+  <div class="two-col">
+    <div>
+      <div class="card"><h2>Företag</h2>
+        ${f('foretag', 'Namn på kvittot')}${f('orgnr', 'Organisationsnummer', { attrs: 'inputmode="numeric" placeholder="XXXXXX-XXXX"' })}${f('adress', 'Adress eller ort', { attrs: 'placeholder="visas på kvittot"' })}
+        ${f('kvittoText', 'Hälsning längst ner på kvittot')}
+      </div>
+      <div class="card"><h2>Swish</h2>
+        ${f('swish', 'Swish-nummer', { attrs: 'inputmode="tel" placeholder="123 456 78 90 eller 070-123 45 67"' })}
+        <p class="fine">Med numret ifyllt visar kassan en QR-kod med beloppet förifyllt när kunden ska betala. Kunden scannar den med kameran eller i Swish-appen.</p>
+      </div>
+      <div class="card"><h2>Kassa</h2>
+        <div class="field-row">
+          <label class="field"><span>Moms för nya produkter</span><select class="input" data-setting="momsStandard">${VAT_RATES.map((v) => `<option value="${v}" ${v === s.momsStandard ? 'selected' : ''}>${v} %</option>`).join('')}</select></label>
+          ${f('vaxelkassa', 'Växelkassa vid start (kr)', { attrs: 'type="number" inputmode="numeric" min="0" step="1"', cls: 'num' })}
+        </div>
+        <p class="fine">Livsmedel och alkoholfri dryck har 6 % moms från 1 april 2026. Ändra moms per produkt under Produkter om något avviker.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card"><h2>PIN-kod</h2>
+        <p>${s.pin ? 'PIN-kod är aktiverad. Den krävs för att makulera kvitton, återställa kopior och radera data.' : 'Ingen PIN-kod. Sätt en om fler än du ska stå i kassan.'}</p>
+        <div class="btn-row"><button class="btn" data-action="set-pin">${s.pin ? 'Byt PIN-kod' : 'Sätt PIN-kod'}</button>${s.pin ? '<button class="btn ghost" data-action="remove-pin">Ta bort PIN-kod</button>' : ''}</div>
+      </div>
+      <div class="card"><h2>Säkerhetskopia</h2>
+        <p class="fine">All data ligger bara på den här enheten: ${state.receipts.length} kvitton, ${state.closings.length} dagsavslut och ${state.products.length} produkter. Ta en kopia efter varje försäljningsdag.</p>
+        <div class="btn-row"><button class="btn primary" data-action="backup">Spara säkerhetskopia</button><button class="btn" data-action="restore">Återställ från kopia</button></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="btn-row"><button class="btn danger-ghost" data-action="wipe">Radera alla kvitton och dagsavslut</button></div>
+      </div>
+      <div class="card"><h2>Installera som app</h2>
+        ${isStandalone() ? '<p>Kassan körs som installerad app på den här enheten.</p>' : `<ol class="steps">
+          <li><b>iPad och iPhone:</b> öppna sidan i Safari, tryck på Dela-knappen och välj <i>Lägg till på hemskärmen</i>.</li>
+          <li><b>Android:</b> öppna sidan i Chrome, tryck på menyn (tre prickar) och välj <i>Installera app</i> eller <i>Lägg till på startskärmen</i>.</li>
+          <li><b>Dator:</b> klicka på installationsikonen till höger i adressfältet i Chrome eller Edge.</li></ol>
+          ${installPrompt ? '<div class="btn-row" style="margin-top:10px"><button class="btn primary" data-action="install">Installera nu</button></div>' : ''}`}
+        <p class="fine" style="margin-top:10px">Installerad från hemskärmen fungerar kassan utan internet och behåller sin data.</p>
+      </div>
+      <div class="card"><h2>Om</h2>
+        <div class="kv"><span>Version</span><b>${APP_VERSION} (${APP_DATE})</b></div>
+        <div class="kv"><span>Beständig lagring</span><b id="persist-state">${ui.persisted === undefined ? 'okänt' : ui.persisted ? 'ja' : 'nej'}</b></div>
+        <div class="kv"><span>Nästa kvittonummer</span><b>#${state.nextReceiptNr}</b></div>
+      </div>
+    </div>
+  </div>`;
+}
+function saveSetting(key, el) {
+  let v = el.value;
+  if (key === 'momsStandard' || key === 'vaxelkassa') v = parseNum(v) ?? 0;
+  else v = v.trim();
+  state.settings[key] = v; save(); toast('Sparat');
+}
+
+// ---------- Modals & dialogs ----------
+function openModal({ title = '', body = '', footer = '', cls = '', dismissable = true, onClose } = {}) {
+  const root = $('#modal-root'); const wrap = document.createElement('div'); wrap.className = 'modal-wrap';
+  wrap.innerHTML = `<div class="modal ${cls}" role="dialog" aria-modal="true" ${title ? `aria-label="${esc(title)}"` : ''}>
+    ${title ? `<div class="modal-head"><h2>${esc(title)}</h2>${dismissable ? '<button class="icon-btn" data-close aria-label="Stäng">×</button>' : ''}</div>` : ''}
+    <div class="modal-body">${body}</div>${footer ? `<div class="modal-foot">${footer}</div>` : ''}</div>`;
+  root.appendChild(wrap);
+  let closed = false;
+  const close = (result) => { if (closed) return; closed = true; wrap.remove(); document.removeEventListener('keydown', onKey); if (onClose) onClose(result); };
+  const onKey = (e) => { if (e.key === 'Escape' && dismissable) close(); };
+  document.addEventListener('keydown', onKey);
+  wrap.addEventListener('click', (e) => { if ((e.target === wrap && dismissable) || e.target.closest('[data-close]')) close(); });
+  return { el: wrap, close };
+}
+function confirmDialog({ title, text, ok = 'OK', cancel = 'Avbryt', danger = false }) {
+  return new Promise((resolve) => {
+    const m = openModal({ title, body: `<p class="modal-text">${text}</p>`, footer: `<button class="btn ghost" data-close>${esc(cancel)}</button><button class="btn ${danger ? 'danger' : 'primary'}" data-ok>${esc(ok)}</button>`, onClose: (r) => resolve(r === true) });
+    $('[data-ok]', m.el).addEventListener('click', () => m.close(true));
+  });
+}
+function textDialog({ title, text = '', label = '', placeholder = '', ok = 'OK', danger = false, initial = '' }) {
+  return new Promise((resolve) => {
+    const m = openModal({ title, body: `${text ? `<p class="modal-text">${text}</p>` : ''}<label class="field"><span>${esc(label)}</span><input class="input" id="td-input" value="${esc(initial)}" placeholder="${esc(placeholder)}"></label>`, footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn ${danger ? 'danger' : 'primary'}" data-ok>${esc(ok)}</button>`, onClose: (r) => resolve(typeof r === 'string' ? r : null) });
+    const input = $('#td-input', m.el); const submit = () => m.close(input.value.trim());
+    $('[data-ok]', m.el).addEventListener('click', submit); input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    setTimeout(() => input.focus(), 50);
+  });
+}
+function mountKeypad(container, { initial = '', decimal = false, maxLen = 9, onChange }) {
+  let val = String(initial || '');
+  container.innerHTML = `<div class="keypad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', decimal ? ',' : '', '0', '⌫'].map((k) => k ? `<button class="key" data-key="${k}" aria-label="${k === '⌫' ? 'Radera' : k}">${k}</button>` : '<span></span>').join('')}</div>`;
+  const set = (v) => { val = v; if (onChange) onChange(val); };
+  const press = (k) => {
+    if (k === '⌫') set(val.slice(0, -1));
+    else if (k === ',') { if (decimal && !val.includes(',')) set((val || '0') + ','); }
+    else if (val.length < maxLen) set(val === '0' ? k : val + k);
+  };
+  container.addEventListener('click', (e) => { const b = e.target.closest('[data-key]'); if (b) press(b.dataset.key); });
+  const onKey = (e) => {
+    if (!container.isConnected) { document.removeEventListener('keydown', onKey); return; }
+    const tag = document.activeElement && document.activeElement.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (/^\d$/.test(e.key)) { press(e.key); e.preventDefault(); }
+    else if (e.key === 'Backspace') { press('⌫'); e.preventDefault(); }
+    else if ((e.key === ',' || e.key === '.') && decimal) { press(','); e.preventDefault(); }
+    else if (e.key === 'Enter') { const ok = container.closest('.modal')?.querySelector('[data-ok]'); if (ok && !ok.disabled) { ok.click(); e.preventDefault(); } }
+  };
+  document.addEventListener('keydown', onKey);
+  return { get: () => val, set, number: () => (val === '' ? null : parseNum(val)) };
+}
+function keypadDialog({ title, label = '', initial = '', suffix = ' kr', secret = false, decimal = false, quick = [], hint = '', ok = 'OK', maxLen = 9 }) {
+  return new Promise((resolve) => {
+    const m = openModal({ title, cls: 'modal-keypad', body: `
+      <div class="keypad-display"><span class="keypad-label">${esc(label)}</span><span class="keypad-value" id="kp-value"></span></div>
+      ${quick.length ? `<div class="quick-row">${quick.map((q) => `<button class="chip" data-quick="${q}">${esc(kr(q))}</button>`).join('')}</div>` : ''}
+      <div id="kp-pad"></div>${hint ? `<p class="hint">${esc(hint)}</p>` : ''}`,
+      footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>${esc(ok)}</button>`,
+      onClose: (r) => resolve(r === undefined ? null : r) });
+    const display = $('#kp-value', m.el);
+    const show = (v) => { display.textContent = v === '' ? '–' : secret ? '•'.repeat(v.length) : v + suffix; };
+    const pad = mountKeypad($('#kp-pad', m.el), { initial, decimal, maxLen, onChange: show }); show(String(initial || ''));
+    $$('[data-quick]', m.el).forEach((b) => b.addEventListener('click', () => pad.set(b.dataset.quick)));
+    $('[data-ok]', m.el).addEventListener('click', () => { const v = pad.get(); if (v === '') { toast('Ange ett värde', 'bad'); return; } m.close(secret ? v : pad.number()); });
+  });
+}
+async function requirePin(reason) {
+  if (!state.settings.pin) return true;
+  const v = await keypadDialog({ title: 'PIN-kod', label: reason || 'Ange PIN', secret: true, suffix: '', maxLen: 8 });
+  if (v === null) return false;
+  if (String(v) === state.settings.pin) return true;
+  toast('Fel PIN-kod', 'bad'); return false;
+}
+function toast(msg, kind = 'ok', { action, onAction, duration = 3200 } = {}) {
+  const root = $('#toast'); const t = document.createElement('div'); t.className = `toast ${kind}`;
+  t.innerHTML = `<span>${esc(msg)}</span>${action ? `<button>${esc(action)}</button>` : ''}`;
+  if (action) t.querySelector('button').addEventListener('click', () => { t.remove(); onAction && onAction(); });
+  root.appendChild(t); setTimeout(() => t.remove(), action ? 12000 : duration);
+}
+async function exportDialog({ name, content, type = 'text/csv;charset=utf-8' }) {
+  const blob = new Blob([content], { type }); let shared = false;
+  if (isTouch() && navigator.canShare) {
+    try { const file = new File([blob], name, { type }); if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); shared = true; } }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  if (shared) return;
+  const m = openModal({ title: 'Export', body: `<p class="modal-text">Filen <b>${esc(name)}</b> är klar.</p><div class="btn-row"><a class="btn primary" id="dl-link" download="${esc(name)}">Ladda ner</a><button class="btn" data-copy>Kopiera innehållet</button></div><p class="hint">Om nedladdningen inte startar: kopiera innehållet och klistra in det i Excel eller Numbers.</p>`, footer: '<button class="btn ghost" data-close>Stäng</button>' });
+  const url = URL.createObjectURL(blob); const a = $('#dl-link', m.el); a.href = url;
+  a.addEventListener('click', () => setTimeout(() => m.close(), 300));
+  $('[data-copy]', m.el).addEventListener('click', async () => { try { await navigator.clipboard.writeText(content); toast('Kopierat'); } catch (e) { toast('Kunde inte kopiera automatiskt', 'bad'); } });
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// ---------- Payment ----------
+function customLineDialog() {
+  const m = openModal({ title: 'Eget belopp', cls: 'modal-keypad', body: `
+    <label class="field"><span>Benämning</span><input class="input" id="cu-name" value="Övrigt" autocomplete="off"></label>
+    <div class="keypad-display"><span class="keypad-label">Belopp</span><span class="keypad-value" id="cu-value">–</span></div>
+    <div id="cu-pad"></div>
+    <label class="field" style="margin-top:12px"><span>Moms</span><select class="input" id="cu-vat">${VAT_RATES.map((v) => `<option value="${v}" ${v === state.settings.momsStandard ? 'selected' : ''}>${v} %</option>`).join('')}</select></label>`,
+    footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Lägg till</button>` });
+  const pad = mountKeypad($('#cu-pad', m.el), { onChange: (v) => { $('#cu-value', m.el).textContent = v ? v + ' kr' : '–'; } });
+  $('[data-ok]', m.el).addEventListener('click', () => {
+    const price = pad.number(); const name = $('#cu-name', m.el).value.trim() || 'Övrigt';
+    if (price === null || price <= 0) { toast('Ange ett belopp', 'bad'); return; }
+    state.cart.lines.push({ productId: null, name, price: r2(price), vat: Number($('#cu-vat', m.el).value), qty: 1 });
+    save(); m.close(); updateCart();
+  });
+}
+function discountDialog() {
+  const cur = state.cart.discount; let type = cur ? cur.type : 'procent';
+  const quickFor = (t) => (t === 'procent' ? [5, 10, 15, 20, 25, 50].map((v) => `<button class="chip" data-quick="${v}">${v} %</button>`) : [5, 10, 20, 50, 100].map((v) => `<button class="chip" data-quick="${v}">${v} kr</button>`)).join('');
+  const m = openModal({ title: 'Rabatt på köpet', cls: 'modal-keypad', body: `
+    <div class="seg"><button class="seg-btn ${type === 'procent' ? 'is-active' : ''}" data-type="procent">Procent</button><button class="seg-btn ${type === 'kr' ? 'is-active' : ''}" data-type="kr">Kronor</button></div>
+    <div class="keypad-display"><span class="keypad-label">Rabatt</span><span class="keypad-value" id="di-value">–</span></div>
+    <div class="quick-row" id="di-quick">${quickFor(type)}</div>
+    <div id="di-pad"></div>
+    <label class="field" style="margin-top:12px"><span>Anledning (valfritt)</span><input class="input" id="di-reason" value="${esc(cur ? cur.reason || '' : '')}" placeholder="t.ex. sista timmen, personal" autocomplete="off"></label>`,
+    footer: `${cur ? '<button class="btn danger-ghost" data-remove>Ta bort rabatt</button>' : ''}<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Använd</button>` });
+  const el = m.el;
+  const show = (v) => { $('#di-value', el).textContent = v ? v + (type === 'procent' ? ' %' : ' kr') : '–'; };
+  const pad = mountKeypad($('#di-pad', el), { initial: cur ? String(cur.value) : '', maxLen: 6, onChange: show }); show(pad.get());
+  const bindQuick = () => $$('[data-quick]', el).forEach((b) => b.addEventListener('click', () => pad.set(b.dataset.quick)));
+  bindQuick();
+  $$('.seg-btn', el).forEach((b) => b.addEventListener('click', () => { type = b.dataset.type; $$('.seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); $('#di-quick', el).innerHTML = quickFor(type); bindQuick(); show(pad.get()); }));
+  $('[data-ok]', el).addEventListener('click', () => {
+    const v = pad.number(); if (v === null || v <= 0) { toast('Ange rabattens storlek', 'bad'); return; }
+    if (type === 'procent' && v > 100) { toast('Max 100 %', 'bad'); return; }
+    state.cart.discount = { type, value: v, reason: $('#di-reason', el).value.trim() }; save(); m.close(); updateCart();
+  });
+  $('[data-remove]', el)?.addEventListener('click', () => { state.cart.discount = null; save(); m.close(); updateCart(); });
+}
+function payCash() {
+  const t = cartTotals(); const quick = quickAmounts(t.total);
+  const m = openModal({ title: 'Kontant', dismissable: false, cls: 'modal-pay', body: `
+    <div class="pay-total"><span>Att betala</span><b>${kr(t.total)}</b></div>
+    <div class="quick-row">${quick.map((q) => `<button class="chip ${q === t.total ? 'chip-strong' : ''}" data-quick="${q}">${q === t.total ? 'Jämnt' : kr(q)}</button>`).join('')}</div>
+    <div class="keypad-display"><span class="keypad-label">Mottaget</span><span class="keypad-value" id="ca-value">–</span></div>
+    <div id="ca-pad"></div>
+    <div class="change-row" id="ca-change"><span>Växel tillbaka</span><b>–</b></div>`,
+    footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn primary big" data-ok disabled>Slutför köp</button>` });
+  const el = m.el; const okBtn = $('[data-ok]', el);
+  const update = (v) => {
+    const received = v === '' ? null : parseNum(v); $('#ca-value', el).textContent = v ? v + ' kr' : '–';
+    const row = $('#ca-change', el);
+    if (received === null) { row.className = 'change-row'; row.querySelector('b').textContent = '–'; okBtn.disabled = true; return; }
+    const change = r2(received - t.total);
+    if (change < 0) { row.className = 'change-row short'; row.querySelector('b').textContent = `saknas ${kr(-change)}`; okBtn.disabled = true; }
+    else { row.className = 'change-row'; row.querySelector('b').textContent = kr(change); okBtn.disabled = false; }
+  };
+  const pad = mountKeypad($('#ca-pad', el), { onChange: update });
+  $$('[data-quick]', el).forEach((b) => b.addEventListener('click', () => pad.set(b.dataset.quick)));
+  okBtn.addEventListener('click', () => { const received = pad.number(); if (received === null || received < t.total) return; m.close(); finalizeSale('kontant', received); });
+}
+function formatSwish(n) { const d = n.replace(/\D/g, ''); if (d.length === 10 && d.startsWith('123')) return d.replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4'); if (d.length === 10) return d.replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '$1-$2 $3 $4'); return n; }
+async function swishQrSvg(number, amount, message) {
+  await loadScript('vendor/qrcode.min.js');
+  const url = `https://app.swish.nu/1/p/sw/?sw=${encodeURIComponent(number)}&amt=${encodeURIComponent(String(amount))}&cur=SEK&msg=${encodeURIComponent(message.slice(0, 50))}&src=qr`;
+  const q = qrcode(0, 'M'); q.addData(url); q.make();
+  try { return q.createSvgTag({ cellSize: 6, margin: 3, scalable: true }); } catch (e) { return q.createSvgTag(6, 3); }
+}
+function paySwish() {
+  const t = cartTotals(); const s = state.settings; const number = (s.swish || '').replace(/[^\d]/g, '');
+  const m = openModal({ title: 'Swish', dismissable: false, cls: 'modal-pay', body: `
+    <div class="pay-total"><span>Att betala</span><b>${kr(t.total)}</b></div>
+    <div class="swish-box" id="swish-qr">${number ? '<p class="hint">Skapar QR-kod…</p>' : ''}</div>
+    ${number ? `<p class="swish-number">Swish till <b>${esc(formatSwish(s.swish))}</b></p><p class="hint" style="text-align:center">Kunden scannar koden med kameran eller i Swish-appen, eller skriver in numret. Bekräfta när betalningen syns i din Swish.</p>` : '<p class="hint">Lägg in ditt Swish-nummer under Inställningar så visas en QR-kod med beloppet ifyllt. Bekräfta när betalningen syns i din Swish.</p>'}`,
+    footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn pay swish big" data-ok>Betalning mottagen</button>` });
+  $('[data-ok]', m.el).addEventListener('click', () => { m.close(); finalizeSale('swish', t.total); });
+  if (number) swishQrSvg(number, t.total, `${s.foretag} kvitto ${state.nextReceiptNr}`).then((svg) => { const box = $('#swish-qr', m.el); if (box) box.innerHTML = svg; })
+    .catch(() => { const box = $('#swish-qr', m.el); if (box) box.innerHTML = '<p class="hint">QR-koden kunde inte skapas. Kunden kan swisha till numret nedan.</p>'; });
+}
+function finalizeSale(payment, received) {
+  const t = cartTotals(); const now = new Date();
+  const receipt = { id: uid(), nr: state.nextReceiptNr, ts: now.toISOString(), day: dayKey(now), lines: state.cart.lines.map((l) => ({ ...l })), discount: t.discount, gross: t.gross, total: t.total, vatLines: t.vatLines, payment, received: payment === 'kontant' ? r2(received) : t.total, change: payment === 'kontant' ? r2(received - t.total) : 0, status: 'ok', voided: null };
+  state.nextReceiptNr += 1; state.receipts.push(receipt); state.cart = { lines: [], discount: null }; save();
+  setCartOpen(false); updateCart(); showDone(receipt);
+}
+function showDone(r) {
+  const m = openModal({ cls: 'modal-done', dismissable: false, body: `<div class="done"><div class="done-title">Tack!</div><div class="done-sum">${kr(r.total)} · ${paymentName(r.payment)}</div>${r.payment === 'kontant' && r.change > 0 ? `<div class="done-change"><span>Växel tillbaka</span><b>${kr(r.change)}</b></div>` : ''}<div class="done-nr">Kvitto #${r.nr} sparat</div></div>`, footer: `<button class="btn ghost" data-show>Visa kvitto</button><button class="btn primary big" data-close>Nästa kund</button>` });
+  $('[data-show]', m.el).addEventListener('click', () => { m.close(); showReceipt(r.id); });
+  setTimeout(() => $('[data-close]', m.el)?.focus(), 50);
+}
+function showReceipt(id) {
+  const r = state.receipts.find((x) => x.id === id); if (!r) return;
+  const m = openModal({ title: `Kvitto #${r.nr}`, body: receiptHtml(r), footer: `${r.status === 'ok' ? '<button class="btn danger-ghost" data-void>Makulera</button>' : ''}<button class="btn primary" data-close>Stäng</button>` });
+  $('[data-void]', m.el)?.addEventListener('click', async () => { m.close(); await voidReceipt(r.id); });
+}
+async function voidReceipt(id) {
+  const r = state.receipts.find((x) => x.id === id); if (!r || r.status !== 'ok') return;
+  const reason = await textDialog({ title: `Makulera kvitto #${r.nr}`, text: `Kvittot på <b>${kr(r.total)}</b> behålls i listan men räknas inte med i försäljningen. Har kunden fått pengarna tillbaka?`, label: 'Anledning', placeholder: 't.ex. felslag, ångrat köp', ok: 'Makulera', danger: true });
+  if (reason === null) return;
+  if (!(await requirePin('Makulering kräver PIN'))) return;
+  r.status = 'makulerad'; r.voided = { ts: new Date().toISOString(), reason }; save(); toast(`Kvitto #${r.nr} makulerat`); render();
+}
+
+// ---------- Backup ----------
+function backup() {
+  const content = JSON.stringify({ app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }, null, 1);
+  exportDialog({ name: `lilbakery-kassa-backup-${dayKey()}.json`, content, type: 'application/json' });
+}
+function restore() {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = '.json,application/json';
+  input.addEventListener('change', async () => {
+    const f = input.files[0]; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (!data || data.app !== 'lilbakery-kassa' || !data.state) throw new Error('Filen är inte en säkerhetskopia från kassan.');
+      const s = migrate(data.state);
+      if (!(await confirmDialog({ title: 'Återställ från kopia', text: `Kopian innehåller ${s.receipts.length} kvitton och ${s.products.length} produkter från ${(data.exportedAt || '').slice(0, 10)}. Allt som finns i kassan nu ersätts.`, ok: 'Återställ', danger: true }))) return;
+      if (!(await requirePin('Återställning kräver PIN'))) return;
+      s.nextReceiptNr = Math.max(s.nextReceiptNr || 1, ...s.receipts.map((r) => r.nr + 1), 1);
+      state = s; save(); toast('Kopian är återställd'); render();
+    } catch (e) { toast(e.message || 'Kunde inte läsa filen', 'bad'); }
+  });
+  input.click();
+}
+async function wipe() {
+  if (!(await confirmDialog({ title: 'Radera kvitton', text: `Alla ${state.receipts.length} kvitton och ${state.closings.length} dagsavslut raderas och kvittonumreringen börjar om från 1. Produkter och inställningar behålls. Spara en säkerhetskopia först om du vill kunna ångra dig.`, ok: 'Radera allt', danger: true }))) return;
+  if (!(await requirePin('Radering kräver PIN'))) return;
+  state.receipts = []; state.closings = []; state.nextReceiptNr = 1; state.cart = { lines: [], discount: null }; save(); toast('Kvitton och dagsavslut raderade'); render();
+}
+async function setPin() {
+  if (state.settings.pin && !(await requirePin('Ange nuvarande PIN'))) return;
+  const a = await keypadDialog({ title: 'Ny PIN-kod', label: '4 till 8 siffror', secret: true, suffix: '', maxLen: 8, ok: 'Nästa' }); if (a === null) return;
+  if (String(a).length < 4) { toast('PIN-koden måste ha minst 4 siffror', 'bad'); return; }
+  const b = await keypadDialog({ title: 'Upprepa PIN-koden', label: 'Samma siffror igen', secret: true, suffix: '', maxLen: 8, ok: 'Spara' }); if (b === null) return;
+  if (String(a) !== String(b)) { toast('Koderna stämde inte överens', 'bad'); return; }
+  state.settings.pin = String(a); save(); toast('PIN-kod sparad'); render();
+}
+
+// ---------- Actions ----------
+const actions = {
+  view: ({ id }) => { ui.view = id; ui.cartOpen = false; render(); },
+  cat: ({ id }) => { ui.cat = id; ui.search = ''; const s = $('[data-role=search]'); if (s) s.value = ''; $$('.cat-row .chip').forEach((c) => c.classList.toggle('is-active', c.dataset.id === id)); updateGrid(); },
+  add: ({ id }) => addToCart(id),
+  inc: ({ i }) => { const l = state.cart.lines[i]; if (l) { l.qty += 1; save(); updateCart(); } },
+  dec: ({ i }) => { const l = state.cart.lines[i]; if (l) { l.qty -= 1; if (l.qty <= 0) state.cart.lines.splice(i, 1); save(); updateCart(); } },
+  'clear-cart': async () => { if (await confirmDialog({ title: 'Töm köpet', text: 'Alla rader i det pågående köpet tas bort.', ok: 'Töm' })) { state.cart = { lines: [], discount: null }; save(); updateCart(); } },
+  'open-cart': () => setCartOpen(true),
+  'close-cart': () => setCartOpen(false),
+  custom: () => customLineDialog(),
+  discount: () => discountDialog(),
+  'pay-swish': () => paySwish(),
+  'pay-cash': () => payCash(),
+  'show-receipt': ({ id }) => showReceipt(id),
+  'day-prev': () => { ui.closeDay = shiftDay(ui.closeDay, -1); render(); },
+  'day-next': () => { ui.closeDay = shiftDay(ui.closeDay, 1); render(); },
+  'open-day': ({ id }) => { ui.closeDay = id; render(); },
+  'save-closing': () => saveClosing(),
+  'export-closing': () => exportDialog({ name: `dagsavslut-${ui.closeDay}.csv`, content: closingCsv(ui.closeDay) }),
+  'export-lines': () => exportDialog({ name: `kvittorader-${ui.closeDay}.csv`, content: linesCsv(state.receipts.filter((r) => r.day === ui.closeDay)) }),
+  'export-all-lines': () => exportDialog({ name: `kvittorader-alla-${dayKey()}.csv`, content: linesCsv(state.receipts) }),
+  'new-product': ({ id }) => productDialog(null, id),
+  'edit-product': ({ id }) => productDialog(id),
+  'prod-up': ({ id }) => moveProduct(id, -1),
+  'prod-down': ({ id }) => moveProduct(id, 1),
+  'new-category': () => categoryDialog(null),
+  'edit-category': ({ id }) => categoryDialog(id),
+  'cat-up': ({ id }) => { if (moveInArray(state.categories, state.categories.findIndex((c) => c.id === id), -1)) { save(); render(); } },
+  'cat-down': ({ id }) => { if (moveInArray(state.categories, state.categories.findIndex((c) => c.id === id), 1)) { save(); render(); } },
+  import: () => importDialog(),
+  'export-products': () => exportDialog({ name: `produkter-${dayKey()}.csv`, content: productsCsv() }),
+  'dismiss-sample': () => { state.meta.sample = false; save(); render(); },
+  'set-pin': () => setPin(),
+  'remove-pin': async () => { if (await requirePin('Ange nuvarande PIN')) { state.settings.pin = ''; save(); toast('PIN-kod borttagen'); render(); } },
+  backup: () => backup(),
+  restore: () => restore(),
+  wipe: () => wipe(),
+  install: async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; render(); }
+};
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]'); if (!el || el.disabled) return;
+  const fn = actions[el.dataset.action]; if (!fn) return;
+  e.preventDefault(); fn({ el, id: el.dataset.id, i: Number(el.dataset.i) });
+});
+document.addEventListener('input', (e) => {
+  const el = e.target; const role = el.dataset.role;
+  if (role === 'search') { ui.search = el.value; if (ui.search.trim()) $$('.cat-row .chip').forEach((c) => c.classList.remove('is-active')); else $$('.cat-row .chip').forEach((c) => c.classList.toggle('is-active', c.dataset.id === ui.cat)); updateGrid(); }
+  else if (role === 'kvitto-search') { ui.kvittoSearch = el.value; const pos = el.selectionStart; $('#view').innerHTML = renderKvitton(); const n = $('[data-role=kvitto-search]'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (err) { /* type=search saknar markörstöd i vissa webbläsare */ } }
+  else if (role === 'float' || role === 'counted') updateCashCalc();
+});
+document.addEventListener('change', (e) => {
+  const el = e.target; const role = el.dataset.role;
+  if (role === 'kvitto-day') { ui.kvittoDay = el.value || dayKey(); render(); }
+  else if (role === 'kvitto-all') { ui.kvittoAll = el.checked; render(); }
+  else if (role === 'close-day') { ui.closeDay = el.value || dayKey(); render(); }
+  else if (el.dataset.setting) saveSetting(el.dataset.setting, el);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.setting) e.target.blur();
+});
+window.addEventListener('online', updateOnline); window.addEventListener('offline', updateOnline);
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; if (ui.view === 'installningar') render(); });
+window.addEventListener('kassa:update', () => toast('En ny version av kassan finns.', 'ok', { action: 'Ladda om', onAction: () => location.reload() }));
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then((p) => { ui.persisted = p; const el = $('#persist-state'); if (el) el.textContent = p ? 'ja' : 'nej'; }).catch(() => {});
+
+tick(); setInterval(tick, 30000); updateOnline(); render();
+})();
+</script>
+<!-- pwa-only --><script>if ('serviceWorker' in navigator && location.protocol !== 'file:') { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then((reg) => { reg.addEventListener('updatefound', () => { const nw = reg.installing; if (!nw) return; nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) window.dispatchEvent(new CustomEvent('kassa:update')); }); }); }).catch(() => {}); }); }</script>
+</body>
+</html>
