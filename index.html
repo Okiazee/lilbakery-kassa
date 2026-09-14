@@ -340,7 +340,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 const APP_DATE = '2026-09-14';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -1280,6 +1280,8 @@ async function voidReceipt(id) {
 
 // ---------- Google Drive via Apps Script ----------
 let driveTimer = null; let driveBusy = false;
+const IN_PREVIEW = /claude/i.test(location.hostname) || (window.top !== window.self && !/localhost|127\.0\.0\.1/.test(location.hostname));
+const PREVIEW_MSG = 'Det här är förhandsvisningen på claude.ai, och den får inte kontakta Google. Öppna kassan på https://okiazee.github.io/lilbakery-kassa/ för att koppla och testa Google Drive.';
 function driveConfigured() { return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec\/?$/.test((state.settings.driveUrl || '').trim()); }
 function backupObject() { return { app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }; }
 function driveScriptText() {
@@ -1313,6 +1315,7 @@ function svar(obj) { return ContentService.createTextOutput(JSON.stringify(obj))
 }
 function driveStatus() {
   const m = state.meta;
+  if (IN_PREVIEW) return { cls: 'warn', text: PREVIEW_MSG };
   if (!driveConfigured()) return { cls: (state.settings.driveUrl || '').trim() ? 'warn' : '', text: (state.settings.driveUrl || '').trim() ? driveUrlProblem() : 'Inte kopplad ännu. Följ stegen nedan.' };
   if (driveBusy) return { cls: '', text: 'Kopierar till Google Drive…' };
   const last = m.driveLastOk ? `Senast kopierad ${m.driveLastOk.slice(0, 10)} ${timeOf(m.driveLastOk)}.` : 'Ingen kopia skickad ännu.';
@@ -1323,7 +1326,7 @@ function driveStatus() {
 function updateDriveStatus() { const el = $('#drive-status'); if (!el) return; const st = driveStatus(); el.className = `status-line ${st.cls}`; el.textContent = st.text; }
 function touchBackup(opts = {}) {
   if (opts.csvDay) state.meta.driveCsvDay = opts.csvDay;
-  if (!driveConfigured() || !state.settings.driveAuto) return;
+  if (IN_PREVIEW || !driveConfigured() || !state.settings.driveAuto) return;
   state.meta.drivePending = true; save(); updateDriveStatus();
   clearTimeout(driveTimer); driveTimer = setTimeout(() => driveUpload().catch(() => {}), opts.now ? 300 : 12000);
 }
@@ -1342,7 +1345,7 @@ async function driveJson(url, opts) {
   }
 }
 async function driveUpload(opts = {}) {
-  if (!driveConfigured()) { if (opts.toast) toast(driveUrlProblem() || 'Fyll i webbappens adress under Google Drive först', 'bad', { duration: 15000 }); return false; }
+  if (IN_PREVIEW || !driveConfigured()) { if (opts.toast) toast(driveUrlProblem() || 'Fyll i webbappens adress under Google Drive först', 'bad', { duration: 15000 }); return false; }
   if (driveBusy) return false;
   if (!navigator.onLine) { state.meta.drivePending = true; save(); updateDriveStatus(); if (opts.toast) toast('Ingen uppkoppling. Kopian skickas när nätet är tillbaka.', 'bad'); return false; }
   driveBusy = true; updateDriveStatus();
@@ -1365,6 +1368,7 @@ async function driveFetchLatest() {
   return driveJson(url);
 }
 function driveUrlProblem() {
+  if (IN_PREVIEW) return PREVIEW_MSG;
   const u = (state.settings.driveUrl || '').trim(); if (!u) return 'Klistra in webbappens adress först. Den ska sluta på /exec.';
   if (/\/dev\/?$/.test(u)) return 'Adressen slutar på /dev och är skriptets testadress. Gör en riktig distribution: Distribuera, Ny distribution, kugghjulet, Webbapp, Kör som Jag, åtkomst Alla. Kopiera sedan adressen som slutar på /exec.';
   if (!driveConfigured()) return 'Adressen ser inte ut som en webbapp-adress. Den ska börja med https://script.google.com/macros/s/ och sluta på /exec.';
