@@ -1041,6 +1041,7 @@ function renderInstallningar() {
         <div id="drive-status" class="status-line ${driveStatus().cls}">${esc(driveStatus().text)}</div>
         ${f('driveUrl', 'Webbappens adress (slutar på /exec)', { attrs: 'inputmode="url" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"' })}
         ${f('driveKey', 'Nyckel, samma som i skriptet', { attrs: 'spellcheck="false"' })}
+        <p class="fine" style="margin-top:-6px">Nyckeln skapas på den här enheten och står i skriptet nedan. Använder du kassan på flera enheter: skriv in exakt samma nyckel och adress på alla.</p>
         <label class="check"><input type="checkbox" data-setting="driveAuto" ${s.driveAuto ? 'checked' : ''}> Kopiera automatiskt efter köp och dagsavslut</label>
         <div class="btn-row" style="margin-top:10px"><button class="btn" data-action="drive-test">Testa anslutningen</button><button class="btn primary" data-action="drive-now">Kopiera nu</button><button class="btn" data-action="drive-restore">Hämta senaste kopian</button></div>
         <details class="howto"><summary>Så kopplar du Google Drive, görs en gång på datorn</summary>
