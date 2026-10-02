@@ -164,7 +164,11 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 
 /* ---------- Kassa ---------- */
 .kassa { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
-@media (max-width: 1023px) { .kassa { grid-template-columns: minmax(0, 1fr) 320px; } }
+@media (max-width: 1023px) {
+  .kassa { grid-template-columns: minmax(0, 1fr) 320px; }
+  .line { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'name sum' 'qty qty'; row-gap: 6px; }
+  .line-name { grid-area: name; overflow-wrap: break-word; } .line-sum { grid-area: sum; align-self: start; } .line .qty { grid-area: qty; justify-self: start; }
+}
 .cat-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .search { flex: 1; min-width: 160px; margin-left: auto; }
 .search .input { min-height: 42px; border-radius: 999px; padding: 6px 16px; }
@@ -179,6 +183,9 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .tile-art.is-photo { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; box-shadow: 0 1px 3px rgba(47,74,77,.25); }
 .tile-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; width: 100%; }
 .tile-name.is-long { font-size: 14px; line-height: 1.25; }
+.tile.needs-price { border-style: dashed; border-color: var(--tile-ink, var(--line-strong)); }
+.tile-price.no-price { color: var(--warn); }
+.price-note { padding: 10px 14px; margin-bottom: 12px; border-radius: var(--radius); background: var(--warn-bg); color: var(--warn); font-weight: 700; }
 .tile-qty { position: absolute; top: -8px; right: -8px; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 999px; background: var(--pink-ink); color: #fff; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--bg); }
 .cart-pane { position: sticky; top: calc(var(--topbar) + 12px); display: flex; flex-direction: column; max-height: calc(100dvh - var(--topbar) - 28px); background: var(--mist); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
 .cart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
@@ -317,6 +324,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
   .cart-bar .btn { min-height: 44px; background: var(--pink-deep); border: 0; color: #fff; }
   .cart-bar.is-empty { opacity: .6; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .line { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: none; } .line-name, .line-sum, .line .qty { grid-area: auto; }
   .modal-wrap { align-items: flex-end; padding: 0; }
   .modal { width: 100%; max-height: calc(100dvh - 20px); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
   #toast { bottom: calc(150px + env(safe-area-inset-bottom)); }
@@ -340,7 +348,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 const APP_DATE = '2026-09-14';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -442,27 +450,31 @@ const isTouch = () => navigator.maxTouchPoints > 1;
 function defaultSettings() {
   return { foretag: "lil'bakery", orgnr: '', adress: '', swish: '', kvittoText: 'Tack för ditt köp!', momsStandard: 6, pin: '', vaxelkassa: 500, driveUrl: '', driveKey: '', driveAuto: true };
 }
+// Sortimentet från pop-up-menyn. Priser i hela kronor inklusive moms.
+const MENU_ID = 'popup-2026-10';
+const MENU = [
+  { id: 'c-croissant', name: 'Croissantbakelser', color: 'butter', icon: 'croissant', items: [['Pain suisse – kaffefyllning', null], ['Croissantbakelse – chai', null], ['Croissantbakelse – red velvet brownie & cream cheese', null]] },
+  { id: 'c-cinnabuns', name: 'Cinnabuns', color: 'pink', icon: 'cinnamonbun', items: [['Cookiedough', null], ['Kryddiga äpplen & cheesecake', null]] },
+  { id: 'c-cookies', name: 'Cookies', color: 'peach', icon: 'cookie', items: [['Crème brûlée', null], ['Morot & lime cream cheese', null], ['Brownie & kärleksmums', null]] },
+  { id: 'c-smabakverk', name: 'Små bakverk', color: 'blue', icon: 'cupcake', items: [['Red velvet cupcakes med lime (laktosfri)', null], ['Chokladbakelse (gluten/laktosfri)', null], ['Minicake morot & cream cheese (gluten/laktosfri)', null]] },
+  { id: 'c-brownie', name: 'Brownie', color: 'mint', icon: 'brownie', items: [['Caramel cornflake brownie', null]] },
+  { id: 'c-dryck', name: 'Dryck', color: 'lavender', icon: 'glass', items: [['Kaffe', null], ['Te', null], ['Läsk', null], ['Vatten', null]] }
+];
+const OLD_SAMPLE = 'Chocolate chip|Red velvet|Biscoff|Oreo|Salted caramel|Vanilj|Choklad|Hallon|Citron|Klassisk brownie|Nutella brownie|Biscoff brownie|Kaffe|Te|Läsk|Vatten';
+function menuCategories() { return MENU.map((c) => ({ id: c.id, name: c.name, color: c.color, image: { kind: 'icon', icon: c.icon } })); }
+function menuProducts() { return MENU.flatMap((c) => c.items.map(([name, price]) => ({ id: uid(), name, price, vat: 6, categoryId: c.id, emoji: '', active: true }))); }
 function seedState() {
-  const cats = [
-    { id: 'c-cookies', name: 'Cookies', color: 'butter', image: { kind: 'icon', icon: 'cookie' } },
-    { id: 'c-minicakes', name: 'Minicakes', color: 'pink', image: { kind: 'icon', icon: 'cupcake' } },
-    { id: 'c-brownies', name: 'Brownies', color: 'peach', image: { kind: 'icon', icon: 'brownie' } },
-    { id: 'c-dryck', name: 'Dryck', color: 'blue', image: { kind: 'icon', icon: 'glass' } }
-  ];
-  const P = (name, price, categoryId) => ({ id: uid(), name, price, vat: 6, categoryId, emoji: '', active: true });
-  const products = [
-    P('Chocolate chip', 35, 'c-cookies'), P('Red velvet', 35, 'c-cookies'), P('Biscoff', 35, 'c-cookies'), P('Oreo', 35, 'c-cookies'), P('Salted caramel', 35, 'c-cookies'),
-    P('Vanilj', 45, 'c-minicakes'), P('Choklad', 45, 'c-minicakes'), P('Hallon', 45, 'c-minicakes'), P('Citron', 45, 'c-minicakes'),
-    P('Klassisk brownie', 40, 'c-brownies'), P('Nutella brownie', 45, 'c-brownies'), P('Biscoff brownie', 45, 'c-brownies'),
-    P('Kaffe', 25, 'c-dryck'), P('Te', 20, 'c-dryck'), P('Läsk', 20, 'c-dryck'), P('Vatten', 15, 'c-dryck')
-  ];
-  return { version: 1, settings: defaultSettings(), categories: cats, products, receipts: [], closings: [], cart: { lines: [], discount: null }, nextReceiptNr: 1, meta: { sample: true, createdAt: new Date().toISOString() } };
+  return { version: 1, settings: defaultSettings(), categories: menuCategories(), products: menuProducts(), receipts: [], closings: [], cart: { lines: [], discount: null }, nextReceiptNr: 1, meta: { sample: false, menu: MENU_ID, createdAt: new Date().toISOString() } };
 }
 function migrate(s) {
   s.settings = Object.assign(defaultSettings(), s.settings || {});
   s.categories = s.categories || []; s.products = s.products || []; s.receipts = s.receipts || []; s.closings = s.closings || [];
   s.cart = s.cart || { lines: [], discount: null }; s.nextReceiptNr = s.nextReceiptNr || 1; s.meta = s.meta || {};
   s.categories.forEach((c) => { if (c.image === undefined) { const g = guessIcon(c.name); c.image = g ? { kind: 'icon', icon: g } : null; } });
+  if (s.meta.sample && s.products.map((p) => p.name).join('|') === OLD_SAMPLE) {
+    s.categories = menuCategories(); s.products = menuProducts(); s.cart = { lines: [], discount: null };
+    s.meta.sample = false; s.meta.menu = MENU_ID; s.meta.menuUpgraded = true;
+  }
   return s;
 }
 function load() {
@@ -471,6 +483,7 @@ function load() {
   return seedState();
 }
 let state = load();
+if (state.meta.menuUpgraded) { delete state.meta.menuUpgraded; save(); setTimeout(() => { toast(state.products.some((x) => x.price == null) ? 'Sortimentet är uppdaterat till pop-up-menyn. Tryck på plattorna och sätt priserna.' : 'Sortimentet är uppdaterat till pop-up-menyn', 'ok', { duration: 9000 }); touchBackup(); }, 800); }
 const ui = { view: 'kassa', cat: 'all', search: '', cartOpen: false, kvittoDay: dayKey(), kvittoAll: false, kvittoSearch: '', closeDay: dayKey() };
 let installPrompt = null;
 function save() {
@@ -536,7 +549,8 @@ function cartQtyMap() { const m = new Map(); state.cart.lines.forEach((l) => { i
 function gridHtml() {
   const products = visibleProducts(); const inCart = cartQtyMap();
   if (!products.length) return `<div class="empty">${state.products.length ? 'Inga produkter matchar sökningen.' : 'Inga produkter ännu. Lägg till dem under Produkter.'}</div>`;
-  return `<div class="grid">${products.map((p) => { const c = catOf(p.categoryId); const col = c ? c.color : 'blue'; const qty = inCart.get(p.id); const art = catArt(c, 'tile-art'); return `<button class="tile" style="--tile:var(--cat-${col});--tile-ink:var(--cat-${col}-ink)" data-action="add" data-id="${p.id}">${p.emoji ? `<span class="tile-emoji">${esc(p.emoji)}</span>` : ''}<span class="tile-name ${p.name.length > 28 ? 'is-long' : ''}">${esc(p.name)}</span><span class="tile-foot"><span class="tile-price">${kr(p.price)}</span>${art}</span>${qty ? `<span class="tile-qty">${qty}</span>` : ''}</button>`; }).join('')}</div>`;
+  const missing = state.products.filter((x) => x.active !== false && x.price == null).length;
+  return `${missing ? `<div class="price-note">${missing} ${missing === 1 ? 'produkt saknar' : 'produkter saknar'} pris. Tryck på en platta märkt Ange pris och skriv in priset.</div>` : ''}<div class="grid">${products.map((p) => { const c = catOf(p.categoryId); const col = c ? c.color : 'blue'; const qty = inCart.get(p.id); const art = catArt(c, 'tile-art'); return `<button class="tile ${p.price == null ? 'needs-price' : ''}" style="--tile:var(--cat-${col});--tile-ink:var(--cat-${col}-ink)" data-action="add" data-id="${p.id}">${p.emoji ? `<span class="tile-emoji">${esc(p.emoji)}</span>` : ''}<span class="tile-name ${p.name.length > 28 ? 'is-long' : ''}">${esc(p.name)}</span><span class="tile-foot">${p.price == null ? '<span class="tile-price no-price">Ange pris</span>' : `<span class="tile-price">${kr(p.price)}</span>`}${art}</span>${qty ? `<span class="tile-qty">${qty}</span>` : ''}</button>`; }).join('')}</div>`;
 }
 function renderKassa() {
   const q = ui.search.trim();
@@ -581,9 +595,17 @@ function updateCart() {
 function updateGrid() { const w = $('#grid-wrap'); if (w) w.innerHTML = gridHtml(); }
 function addToCart(id) {
   const p = state.products.find((x) => x.id === id); if (!p) return;
+  if (p.price == null) { setPriceDialog(p); return; }
   const line = state.cart.lines.find((l) => l.productId === id && l.price === p.price);
   if (line) line.qty += 1; else state.cart.lines.push({ productId: id, name: p.name, price: p.price, vat: p.vat, qty: 1 });
   save(); updateCart();
+}
+async function setPriceDialog(p) {
+  const v = await keypadDialog({ title: p.name, label: 'Pris inkl. moms', ok: 'Spara pris' });
+  if (v === null) return;
+  if (!(v > 0)) { toast('Ange ett pris över 0 kr', 'bad'); return; }
+  p.price = r2(v); save(); touchBackup(); updateGrid();
+  toast(`${p.name}: ${kr(p.price)}. Tryck på plattan igen för att sälja.`);
 }
 function setCartOpen(open) { ui.cartOpen = open; const k = $('#kassa'); if (k) k.classList.toggle('cart-open', open); document.body.classList.toggle('cart-open', open); }
 
@@ -737,15 +759,15 @@ function linesCsv(receipts) {
 }
 function productsCsv() {
   const rows = [['Kategori', 'Produkt', 'Pris', 'Moms', 'Aktiv']];
-  state.categories.forEach((c) => state.products.filter((p) => p.categoryId === c.id).forEach((p) => rows.push([c.name, p.name, csvNum(p.price), p.vat, p.active === false ? 'nej' : 'ja'])));
-  state.products.filter((p) => !catOf(p.categoryId)).forEach((p) => rows.push(['', p.name, csvNum(p.price), p.vat, p.active === false ? 'nej' : 'ja']));
+  state.categories.forEach((c) => state.products.filter((p) => p.categoryId === c.id).forEach((p) => rows.push([c.name, p.name, (p.price == null ? '' : csvNum(p.price)), p.vat, p.active === false ? 'nej' : 'ja'])));
+  state.products.filter((p) => !catOf(p.categoryId)).forEach((p) => rows.push(['', p.name, (p.price == null ? '' : csvNum(p.price)), p.vat, p.active === false ? 'nej' : 'ja']));
   return BOM + rows.map(csvRow).join('\r\n');
 }
 
 // --- Produkter ---
 function renderProdukter() {
   const banner = state.meta.sample ? `<div class="notice">Det här är exempelprodukter för att visa hur kassan fungerar. Importera din egen lista från Word eller ändra dem här.<button class="btn small" data-action="dismiss-sample">Dölj</button></div>` : '';
-  const prodRow = (p) => `<div class="prod-row ${p.active === false ? 'is-off' : ''}"><span class="row-emoji">${esc(p.emoji || '')}</span><button class="prod-main" data-action="edit-product" data-id="${p.id}"><span>${esc(p.name)}${p.active === false ? ' <span class="badge off">Dold</span>' : ''}${p.vat !== state.settings.momsStandard ? ` <span class="badge vat">moms ${p.vat} %</span>` : ''}</span></button><span class="prod-price">${kr(p.price)}</span><span class="mini-btns"><button class="mini" data-action="prod-up" data-id="${p.id}" aria-label="Flytta upp">↑</button><button class="mini" data-action="prod-down" data-id="${p.id}" aria-label="Flytta ner">↓</button></span></div>`;
+  const prodRow = (p) => `<div class="prod-row ${p.active === false ? 'is-off' : ''}"><span class="row-emoji">${esc(p.emoji || '')}</span><button class="prod-main" data-action="edit-product" data-id="${p.id}"><span>${esc(p.name)}${p.active === false ? ' <span class="badge off">Dold</span>' : ''}${p.vat !== state.settings.momsStandard ? ` <span class="badge vat">moms ${p.vat} %</span>` : ''}</span></button><span class="prod-price">${p.price == null ? '<span class="badge off">Pris saknas</span>' : kr(p.price)}</span><span class="mini-btns"><button class="mini" data-action="prod-up" data-id="${p.id}" aria-label="Flytta upp">↑</button><button class="mini" data-action="prod-down" data-id="${p.id}" aria-label="Flytta ner">↓</button></span></div>`;
   const cards = state.categories.map((c, i) => {
     const ps = state.products.filter((p) => p.categoryId === c.id);
     return `<div class="card cat-card"><div class="cat-head" style="--chip-ink:var(--cat-${c.color}-ink)">${catArt(c, 'cat-art') || `<i class="dot" style="background:var(--cat-${c.color})"></i>`}<h2>${esc(c.name)}</h2><span class="muted">${ps.length} st</span><span class="cat-btns"><button class="mini" data-action="cat-up" data-id="${c.id}" aria-label="Flytta kategorin upp" ${i === 0 ? 'disabled' : ''}>↑</button><button class="mini" data-action="cat-down" data-id="${c.id}" aria-label="Flytta kategorin ner" ${i === state.categories.length - 1 ? 'disabled' : ''}>↓</button><button class="btn ghost small" data-action="edit-category" data-id="${c.id}">Ändra</button></span></div>
@@ -871,8 +893,8 @@ function productsFromTable(rows) {
   const head = clean[0].map((c) => c.toLowerCase());
   const find = (re) => head.findIndex((h) => re.test(h));
   let nameIdx = find(/produkt|namn|vara|artikel/), priceIdx = find(/pris|kr|belopp/), catIdx = find(/kategori|grupp|typ|sort/), vatIdx = find(/moms/), emojiIdx = find(/ikon|emoji/);
-  let body = clean;
-  if (nameIdx >= 0 && priceIdx >= 0) body = clean.slice(1);
+  let body = clean; let headerMode = false;
+  if (nameIdx >= 0 && priceIdx >= 0) { body = clean.slice(1); headerMode = true; }
   else {
     const cols = Math.max(...clean.map((r) => r.length));
     const numeric = (i) => { const vals = clean.map((r) => r[i]).filter(Boolean); return vals.length && vals.filter((v) => /^\s*\d+([.,]\d{1,2})?\s*(kr|:-|sek)?\s*$/i.test(v)).length >= vals.length * 0.6; };
@@ -886,9 +908,9 @@ function productsFromTable(rows) {
   const out = []; let lastCat = '';
   for (const r of body) {
     const name = r[nameIdx] || ''; const price = parseNum((r[priceIdx] || '').replace(/[^\d.,]/g, ''));
-    if (!name || price === null) continue;
+    if (!name || (price === null && !headerMode)) continue;
     const cat = catIdx >= 0 && r[catIdx] ? r[catIdx] : lastCat; if (catIdx >= 0 && r[catIdx]) lastCat = r[catIdx];
-    out.push({ name, price: r2(price), category: cat, vat: vatIdx >= 0 ? parseVat(r[vatIdx]) : null, emoji: emojiIdx >= 0 ? (r[emojiIdx] || '') : '' });
+    out.push({ name, price: price === null ? null : r2(price), category: cat, vat: vatIdx >= 0 ? parseVat(r[vatIdx]) : null, emoji: emojiIdx >= 0 ? (r[emojiIdx] || '') : '' });
   }
   return out;
 }
@@ -980,7 +1002,7 @@ function importPreview(items) {
     <div class="seg"><button class="seg-btn is-active" data-mode="merge">Lägg till och uppdatera</button><button class="seg-btn" data-mode="replace">Ersätt hela sortimentet</button></div>
     <p class="hint" id="imp-mode-hint">Produkter med samma namn får nytt pris, nya produkter läggs till. Inget tas bort.</p>
     <div class="table-wrap"><table class="table import-table"><thead><tr><th><input type="checkbox" id="imp-all" checked aria-label="Välj alla"></th><th>Kategori</th><th>Produkt</th><th class="num">Pris</th><th class="num">Moms</th></tr></thead><tbody>
-    ${items.map((it, i) => `<tr><td><input type="checkbox" data-i="${i}" checked></td><td>${esc(it.category)}</td><td>${esc(it.emoji ? it.emoji + ' ' : '')}${esc(it.name)}</td><td class="num">${kr(it.price)}</td><td class="num">${it.vat ?? std} %</td></tr>`).join('')}
+    ${items.map((it, i) => `<tr><td><input type="checkbox" data-i="${i}" checked></td><td>${esc(it.category)}</td><td>${esc(it.emoji ? it.emoji + ' ' : '')}${esc(it.name)}</td><td class="num">${it.price == null ? '<span class="badge off">saknas</span>' : kr(it.price)}</td><td class="num">${it.vat ?? std} %</td></tr>`).join('')}
     </tbody></table></div>`,
     footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Importera</button>` });
   const el = m.el; let mode = 'merge';
@@ -994,7 +1016,7 @@ function importPreview(items) {
     for (const it of chosen) {
       const categoryId = ensureCategory(it.category); const vat = it.vat ?? std;
       const existing = state.products.find((p) => p.name.toLowerCase() === it.name.toLowerCase() && (p.categoryId === categoryId || mode === 'merge'));
-      if (existing) { Object.assign(existing, { price: it.price, vat, categoryId }); if (it.emoji) existing.emoji = it.emoji; updated++; }
+      if (existing) { Object.assign(existing, { vat, categoryId }); if (it.price != null) existing.price = it.price; if (it.emoji) existing.emoji = it.emoji; updated++; }
       else { state.products.push({ id: uid(), name: it.name, price: it.price, vat, categoryId, emoji: it.emoji || '', active: true }); added++; }
     }
     state.meta.sample = false; save(); m.close(); touchBackup(); toast(`${added} nya, ${updated} uppdaterade`); render();
@@ -1156,11 +1178,11 @@ async function requirePin(reason) {
   if (String(v) === state.settings.pin) return true;
   toast('Fel PIN-kod', 'bad'); return false;
 }
-function toast(msg, kind = 'ok', { action, onAction, duration = 3200 } = {}) {
+function toast(msg, kind = 'ok', { action, onAction, duration = 3200, persist = false } = {}) {
   const root = $('#toast'); const t = document.createElement('div'); t.className = `toast ${kind}`;
   t.innerHTML = `<span>${esc(msg)}</span>${action ? `<button>${esc(action)}</button>` : ''}`;
   if (action) t.querySelector('button').addEventListener('click', () => { t.remove(); onAction && onAction(); });
-  root.appendChild(t); setTimeout(() => t.remove(), action ? 12000 : duration);
+  root.appendChild(t); if (!persist) setTimeout(() => t.remove(), action ? 12000 : duration);
 }
 async function exportDialog({ name, content, type = 'text/csv;charset=utf-8' }) {
   const blob = new Blob([content], { type }); let shared = false;
@@ -1406,7 +1428,7 @@ function backup() {
 }
 async function applyBackup(data, sourceLabel) {
   if (!data || data.app !== 'lilbakery-kassa' || !data.state) throw new Error('Filen är inte en säkerhetskopia från kassan.');
-  const n = migrate(data.state);
+  const n = migrate(data.state); delete n.meta.menuUpgraded;
   if (!(await confirmDialog({ title: 'Återställ från kopia', text: `Kopian innehåller ${n.receipts.length} kvitton och ${n.products.length} produkter (${esc(sourceLabel)}). Allt som finns i kassan nu ersätts.`, ok: 'Återställ', danger: true }))) return false;
   if (!(await requirePin('Återställning kräver PIN'))) return false;
   n.nextReceiptNr = Math.max(n.nextReceiptNr || 1, ...n.receipts.map((r) => r.nr + 1), 1);
@@ -1506,12 +1528,17 @@ window.addEventListener('online', updateOnline); window.addEventListener('offlin
 window.addEventListener('online', () => { if (state.meta.drivePending && driveConfigured() && state.settings.driveAuto) setTimeout(() => driveUpload().catch(() => {}), 2000); });
 if (state.meta.drivePending && driveConfigured() && state.settings.driveAuto) setTimeout(() => driveUpload().catch(() => {}), 6000);
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; if (ui.view === 'installningar') render(); });
-window.addEventListener('kassa:update', () => toast('En ny version av kassan finns.', 'ok', { action: 'Ladda om', onAction: () => location.reload() }));
+window.addEventListener('kassa:update', () => {
+  const active = document.activeElement && document.activeElement.tagName;
+  const busy = state.cart.lines.length || document.querySelector('.modal-wrap') || ['INPUT', 'TEXTAREA', 'SELECT'].includes(active);
+  if (!busy) { location.reload(); return; }
+  toast('En ny version av kassan finns.', 'ok', { action: 'Ladda om', onAction: () => location.reload(), persist: true });
+});
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then((p) => { ui.persisted = p; const el = $('#persist-state'); if (el) el.textContent = p ? 'ja' : 'nej'; }).catch(() => {});
 
 tick(); setInterval(tick, 30000); updateOnline(); render();
 })();
 </script>
-<!-- pwa-only --><script>if ('serviceWorker' in navigator && location.protocol !== 'file:') { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then((reg) => { reg.addEventListener('updatefound', () => { const nw = reg.installing; if (!nw) return; nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) window.dispatchEvent(new CustomEvent('kassa:update')); }); }); }).catch(() => {}); }); }</script>
+<!-- pwa-only --><script>if ('serviceWorker' in navigator && location.protocol !== 'file:') { const hadController = !!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) window.dispatchEvent(new CustomEvent('kassa:update')); }); window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then((reg) => { document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); }); }).catch(() => {}); }); }</script>
 </body>
 </html>
