@@ -348,8 +348,8 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.3.2';
-const APP_DATE = '2026-09-14';
+const APP_VERSION = '1.3.3';
+const APP_DATE = '2026-10-02';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
 const CAT_COLORS = ['butter', 'pink', 'peach', 'blue', 'mint', 'lavender'];
@@ -1090,22 +1090,24 @@ function renderInstallningar() {
           <li><b>Android:</b> öppna sidan i Chrome, tryck på menyn (tre prickar) och välj <i>Installera app</i> eller <i>Lägg till på startskärmen</i>.</li>
           <li><b>Dator:</b> klicka på installationsikonen till höger i adressfältet i Chrome eller Edge.</li></ol>
           ${installPrompt ? '<div class="btn-row" style="margin-top:10px"><button class="btn primary" data-action="install">Installera nu</button></div>' : ''}`}
-        <p class="fine" style="margin-top:10px">Installerad från hemskärmen fungerar kassan utan internet och behåller sin data.</p>
+        <p class="fine" style="margin-top:10px">Installerad från hemskärmen fungerar kassan utan internet och behåller sin data. Öppna den alltid från hemskärmen. Safari har en egen, separat lagring.</p>
       </div>
       <div class="card"><h2>Om</h2>
         <div class="kv"><span>Version</span><b>${APP_VERSION} (${APP_DATE})</b></div>
         <div class="kv"><span>Beständig lagring</span><b id="persist-state">${ui.persisted === undefined ? 'okänt' : ui.persisted ? 'ja' : 'nej'}</b></div>
         <div class="kv"><span>Nästa kvittonummer</span><b>#${state.nextReceiptNr}</b></div>
+        <div class="btn-row" style="margin-top:10px"><button class="btn primary" data-action="check-update">Sök efter uppdatering</button></div>
+        <p class="fine" style="margin-top:10px">Kassan uppdaterar sig själv när den öppnas. Inställningar, produkter och kvitton finns kvar efter en uppdatering, så du behöver aldrig installera om. Tar du bort appen från hemskärmen raderas allt som sparats på enheten. Har det hänt: fyll i Google Drive-uppgifterna och tryck Hämta senaste kopian.</p>
       </div>
     </div>
   </div>`;
 }
-function saveSetting(key, el) {
+function saveSetting(key, el, quiet = false) {
   let v = el.type === 'checkbox' ? el.checked : el.value;
   if (key === 'momsStandard' || key === 'vaxelkassa') v = parseNum(v) ?? 0;
   else if (key === 'driveKey') v = String(v).replace(/[^\w-]/g, '');
   else if (typeof v === 'string') v = v.trim();
-  state.settings[key] = v; save(); toast('Sparat');
+  state.settings[key] = v; save(); if (!quiet) toast('Sparat');
   if (key.startsWith('drive')) { updateDriveStatus(); if (key === 'driveKey') { const pre = $('#drive-script'); if (pre) pre.textContent = driveScriptText(); } }
   else touchBackup();
 }
@@ -1424,6 +1426,25 @@ function afterClosingSaved(day) {
   else toast('Dagsavslut sparat. Kom ihåg att spara en säkerhetskopia under Inställningar.', 'ok', { duration: 6000 });
 }
 
+// ---------- Uppdatering ----------
+async function checkForUpdate(btn) {
+  if (IN_PREVIEW || !('serviceWorker' in navigator)) { toast('Förhandsvisningen visar alltid senaste versionen.'); return; }
+  if (navigator.onLine === false) { toast('Ingen internetanslutning. Sök igen när enheten är uppkopplad.', 'bad'); return; }
+  const reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) { location.reload(); return; }
+  const reset = () => { if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = 'Sök efter uppdatering'; } };
+  if (btn) { btn.disabled = true; btn.textContent = 'Söker…'; }
+  let found = false; const onFound = () => { found = true; };
+  reg.addEventListener('updatefound', onFound);
+  try { await reg.update(); }
+  catch (e) { reset(); toast('Kunde inte söka efter uppdatering. Kontrollera internetanslutningen.', 'bad'); return; }
+  finally { reg.removeEventListener('updatefound', onFound); }
+  if (found || reg.installing || reg.waiting) {
+    toast('Ny version hittad. Kassan startar om…', 'ok', { persist: true });
+    setTimeout(() => location.reload(), 5000);
+  } else { reset(); toast(`Kassan har senaste versionen, ${APP_VERSION}.`); }
+}
+
 // ---------- Backup ----------
 function backup() {
   const content = JSON.stringify({ app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }, null, 1);
@@ -1504,6 +1525,7 @@ const actions = {
   'drive-now': () => { state.meta.driveCsvDay = state.meta.driveCsvDay || (state.closings.some((c) => c.day === dayKey()) ? dayKey() : null); driveUpload({ toast: true }); },
   'drive-restore': () => driveRestore(),
   'copy-script': async () => { try { await navigator.clipboard.writeText(driveScriptText()); toast('Skriptet är kopierat. Klistra in det i script.google.com.'); } catch (e) { toast('Markera texten i rutan och kopiera den manuellt', 'bad'); } },
+  'check-update': ({ el }) => checkForUpdate(el),
   install: async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; render(); }
 };
 document.addEventListener('click', (e) => {
@@ -1511,8 +1533,17 @@ document.addEventListener('click', (e) => {
   const fn = actions[el.dataset.action]; if (!fn) return;
   e.preventDefault(); fn({ el, id: el.dataset.id, i: Number(el.dataset.i) });
 });
+const pendingSettings = new Map();
+function queueSetting(el) {
+  const key = el.dataset.setting; const prev = pendingSettings.get(key); if (prev) clearTimeout(prev.t);
+  pendingSettings.set(key, { el, t: setTimeout(() => { pendingSettings.delete(key); saveSetting(key, el, true); }, 400) });
+}
+function flushSettings() { for (const [key, { el, t }] of pendingSettings) { clearTimeout(t); saveSetting(key, el, true); } pendingSettings.clear(); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSettings(); });
+window.addEventListener('pagehide', flushSettings);
 document.addEventListener('input', (e) => {
   const el = e.target; const role = el.dataset.role;
+  if (el.dataset.setting) { queueSetting(el); return; }
   if (role === 'search') { ui.search = el.value; if (ui.search.trim()) $$('.cat-row .chip').forEach((c) => c.classList.remove('is-active')); else $$('.cat-row .chip').forEach((c) => c.classList.toggle('is-active', c.dataset.id === ui.cat)); updateGrid(); }
   else if (role === 'kvitto-search') { ui.kvittoSearch = el.value; const pos = el.selectionStart; $('#view').innerHTML = renderKvitton(); const n = $('[data-role=kvitto-search]'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (err) { /* type=search saknar markörstöd i vissa webbläsare */ } }
   else if (role === 'float' || role === 'counted') updateCashCalc();
@@ -1522,7 +1553,7 @@ document.addEventListener('change', (e) => {
   if (role === 'kvitto-day') { ui.kvittoDay = el.value || dayKey(); render(); }
   else if (role === 'kvitto-all') { ui.kvittoAll = el.checked; render(); }
   else if (role === 'close-day') { ui.closeDay = el.value || dayKey(); render(); }
-  else if (el.dataset.setting) saveSetting(el.dataset.setting, el);
+  else if (el.dataset.setting) { const prev = pendingSettings.get(el.dataset.setting); if (prev) { clearTimeout(prev.t); pendingSettings.delete(el.dataset.setting); } saveSetting(el.dataset.setting, el); }
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.setting) e.target.blur();
