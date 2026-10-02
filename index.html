@@ -175,11 +175,11 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .tile-name { font-weight: 800; font-size: 16px; line-height: 1.2; overflow-wrap: anywhere; }
 .tile-price { font-weight: 800; color: var(--blue-ink); font-variant-numeric: tabular-nums; }
 .art { stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; display: block; }
-.tile-art { position: absolute; top: 10px; right: 10px; width: 44px; height: 44px; color: var(--tile-ink, var(--blue-ink)); }
-.tile-art.is-photo { width: 54px; height: 54px; border-radius: 12px; object-fit: cover; box-shadow: 0 1px 3px rgba(47,74,77,.25); }
-.tile.has-art .tile-name { padding-right: 46px; }
-.tile.has-photo .tile-name { padding-right: 56px; }
-.tile-qty { position: absolute; bottom: 10px; right: 10px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px; background: var(--pink-ink); color: #fff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.tile-art { width: 34px; height: 34px; flex: none; color: var(--tile-ink, var(--blue-ink)); }
+.tile-art.is-photo { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; box-shadow: 0 1px 3px rgba(47,74,77,.25); }
+.tile-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; width: 100%; }
+.tile-name.is-long { font-size: 14px; line-height: 1.25; }
+.tile-qty { position: absolute; top: -8px; right: -8px; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 999px; background: var(--pink-ink); color: #fff; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--bg); }
 .cart-pane { position: sticky; top: calc(var(--topbar) + 12px); display: flex; flex-direction: column; max-height: calc(100dvh - var(--topbar) - 28px); background: var(--mist); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
 .cart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .cart-title { font-weight: 800; font-size: 18px; }
@@ -340,7 +340,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.3.0';
 const APP_DATE = '2026-09-14';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -379,9 +379,10 @@ const ART = {
 };
 const ART_LABELS = { cookie: 'Cookie', cupcake: 'Cupcake', muffin: 'Muffin', brownie: 'Brownie', cake: 'Tårta', cakeslice: 'Tårtbit', donut: 'Munk', cinnamonbun: 'Bulle', croissant: 'Croissant', bread: 'Bröd', macaron: 'Macaron', icecream: 'Glass', coffee: 'Kaffe', tea: 'Te', cup: 'Take away', glass: 'Kall dryck', bottle: 'Flaska', candy: 'Godis', heart: 'Hjärta', gift: 'Present', star: 'Stjärna' };
 const ICON_GUESS = [
-  [/cookie|kaka|kakor|kex/, 'cookie'], [/minicake|cupcake/, 'cupcake'], [/muffin/, 'muffin'], [/brownie|blondie/, 'brownie'],
-  [/tårtbit|slice/, 'cakeslice'], [/tårta|tarta|cake|bakelse/, 'cake'], [/donut|munk/, 'donut'], [/bull|kanel/, 'cinnamonbun'],
-  [/croissant|wiener|giffel/, 'croissant'], [/bröd|brod|bread|limpa|surdeg|fralla/, 'bread'], [/macaron/, 'macaron'], [/glass|ice ?cream/, 'icecream'],
+  [/croissant|pain suisse|wiener|giffel/, 'croissant'], [/cinnabun|cinnamon|kanel|bulle|bullar/, 'cinnamonbun'],
+  [/cookie|kaka|kakor|kex/, 'cookie'], [/minicake|cupcake|bakverk/, 'cupcake'], [/muffin/, 'muffin'], [/brownie|blondie/, 'brownie'],
+  [/tårtbit|slice/, 'cakeslice'], [/tårta|tarta|cake|bakelse/, 'cake'], [/donut|munk/, 'donut'],
+  [/bröd|brod|bread|limpa|surdeg|fralla/, 'bread'], [/macaron/, 'macaron'], [/glass|ice ?cream/, 'icecream'],
   [/kaffe|coffee|latte|cappuccino|espresso/, 'coffee'], [/\bte\b|\btea\b|chai/, 'tea'], [/take ?away|mugg/, 'cup'], [/flask|bottle/, 'bottle'],
   [/dryck|drink|läsk|lask|juice|saft|vatten|smoothie|kall/, 'glass'], [/godis|candy|karamell/, 'candy'], [/present|paket|gift|låda/, 'gift'], [/hjärta|heart|kärlek/, 'heart']
 ];
@@ -535,7 +536,7 @@ function cartQtyMap() { const m = new Map(); state.cart.lines.forEach((l) => { i
 function gridHtml() {
   const products = visibleProducts(); const inCart = cartQtyMap();
   if (!products.length) return `<div class="empty">${state.products.length ? 'Inga produkter matchar sökningen.' : 'Inga produkter ännu. Lägg till dem under Produkter.'}</div>`;
-  return `<div class="grid">${products.map((p) => { const c = catOf(p.categoryId); const col = c ? c.color : 'blue'; const qty = inCart.get(p.id); const art = catArt(c, 'tile-art'); const photo = c && c.image && c.image.kind === 'photo'; return `<button class="tile ${art ? 'has-art' : ''} ${photo ? 'has-photo' : ''}" style="--tile:var(--cat-${col});--tile-ink:var(--cat-${col}-ink)" data-action="add" data-id="${p.id}">${art}${p.emoji ? `<span class="tile-emoji">${esc(p.emoji)}</span>` : ''}<span class="tile-name">${esc(p.name)}</span><span class="tile-price">${kr(p.price)}</span>${qty ? `<span class="tile-qty">${qty}</span>` : ''}</button>`; }).join('')}</div>`;
+  return `<div class="grid">${products.map((p) => { const c = catOf(p.categoryId); const col = c ? c.color : 'blue'; const qty = inCart.get(p.id); const art = catArt(c, 'tile-art'); return `<button class="tile" style="--tile:var(--cat-${col});--tile-ink:var(--cat-${col}-ink)" data-action="add" data-id="${p.id}">${p.emoji ? `<span class="tile-emoji">${esc(p.emoji)}</span>` : ''}<span class="tile-name ${p.name.length > 28 ? 'is-long' : ''}">${esc(p.name)}</span><span class="tile-foot"><span class="tile-price">${kr(p.price)}</span>${art}</span>${qty ? `<span class="tile-qty">${qty}</span>` : ''}</button>`; }).join('')}</div>`;
 }
 function renderKassa() {
   const q = ui.search.trim();
