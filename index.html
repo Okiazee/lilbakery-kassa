@@ -326,6 +326,17 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .badge.today { background: var(--pink-ink); color: #fff; }
 .paper-po { text-align: center; font-weight: 800; color: var(--pink-ink); font-size: 13px; margin-top: 2px; }
 
+.order-note { padding: 10px 14px; margin-bottom: 12px; border-radius: var(--radius); background: var(--mist); color: var(--blue-ink); font-weight: 700; }
+.grid-section + .grid-section { margin-top: 16px; }
+.grid-head { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 16px; }
+.grid-head .cat-art { width: 26px; height: 26px; }
+.grid-head-btns { margin-left: auto; display: flex; gap: 6px; }
+.tile.is-editing { cursor: default; border: 1.5px dashed var(--tile-ink, var(--line-strong)); }
+.tile.is-editing:active { transform: none; }
+.tile.is-editing .tile-foot { align-items: center; }
+.mini.move { width: 44px; height: 40px; font-size: 18px; font-weight: 800; color: var(--blue-ink); border-color: var(--line-strong); background: #fff; }
+.order-btn { margin-left: 0; white-space: nowrap; }
+
 /* ---------- Toast ---------- */
 #toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
 .toast { pointer-events: auto; display: flex; gap: 12px; align-items: center; padding: 12px 18px; border-radius: 999px; background: var(--ink); color: #fff; font-weight: 700; box-shadow: var(--shadow); animation: pop .2s ease-out; }
@@ -378,7 +389,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const APP_DATE = '2026-10-04';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -519,7 +530,7 @@ function load() {
 }
 let state = load();
 if (state.meta.menuUpgraded) { delete state.meta.menuUpgraded; save(); setTimeout(() => { toast(state.products.some((x) => x.price == null) ? 'Sortimentet är uppdaterat till pop-up-menyn. Tryck på plattorna och sätt priserna.' : 'Sortimentet är uppdaterat till pop-up-menyn', 'ok', { duration: 9000 }); touchBackup(); }, 800); }
-const ui = { view: 'kassa', cat: 'all', search: '', cartOpen: false, kvittoDay: dayKey(), kvittoAll: false, kvittoSearch: '', closeDay: dayKey(), poSearch: '', poShowAllPaid: false };
+const ui = { view: 'kassa', cat: 'all', search: '', cartOpen: false, kvittoDay: dayKey(), kvittoAll: false, kvittoSearch: '', closeDay: dayKey(), poSearch: '', poShowAllPaid: false, editOrder: false };
 let installPrompt = null;
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
@@ -580,12 +591,41 @@ function updateOnline() { $('#offline').classList.toggle('hidden', navigator.onL
 
 // --- Kassa ---
 function catOf(id) { return state.categories.find((c) => c.id === id); }
+function catIndex(id) { const i = state.categories.findIndex((c) => c.id === id); return i < 0 ? 9999 : i; }
 function visibleProducts() {
   const q = ui.search.trim().toLowerCase();
-  return state.products.filter((p) => p.active !== false).filter((p) => (q ? p.name.toLowerCase().includes(q) : ui.cat === 'all' || p.categoryId === ui.cat));
+  // Kategoriernas ordning först, sedan produkternas ordning inom kategorin.
+  return state.products.filter((p) => p.active !== false).filter((p) => (q ? p.name.toLowerCase().includes(q) : ui.cat === 'all' || p.categoryId === ui.cat))
+    .sort((a, b) => catIndex(a.categoryId) - catIndex(b.categoryId));
 }
 function cartQtyMap() { const m = new Map(); state.cart.lines.forEach((l) => { if (l.productId) m.set(l.productId, (m.get(l.productId) || 0) + l.qty); }); return m; }
+function tileEditHtml(p, c, i, n) {
+  const col = c ? c.color : 'blue';
+  return `<div class="tile is-editing" style="--tile:var(--cat-${col});--tile-ink:var(--cat-${col}-ink)"><span class="tile-name ${p.name.length > 28 ? 'is-long' : ''}">${esc(p.name)}</span><span class="tile-foot"><button class="mini move" data-action="k-move" data-id="${p.id}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Flytta ${esc(p.name)} tidigare">←</button><span class="tile-price ${p.price == null ? 'no-price' : ''}">${p.price == null ? 'Pris saknas' : kr(p.price)}</span><button class="mini move" data-action="k-move" data-id="${p.id}" data-dir="1" ${i === n - 1 ? 'disabled' : ''} aria-label="Flytta ${esc(p.name)} senare">→</button></span></div>`;
+}
+function gridEditHtml() {
+  const cats = ui.cat === 'all' ? state.categories : state.categories.filter((c) => c.id === ui.cat);
+  const last = state.categories.length - 1;
+  const sections = cats.map((c) => {
+    const ci = state.categories.indexOf(c); const ps = state.products.filter((x) => x.categoryId === c.id && x.active !== false);
+    return `<div class="grid-section"><div class="grid-head" style="--chip-ink:var(--cat-${c.color}-ink)">${catArt(c, 'cat-art') || `<i class="dot" style="background:var(--cat-${c.color})"></i>`}<b>${esc(c.name)}</b><span class="grid-head-btns"><button class="mini move" data-action="k-cat" data-id="${c.id}" data-dir="-1" ${ci === 0 ? 'disabled' : ''} aria-label="Flytta kategorin ${esc(c.name)} tidigare">↑</button><button class="mini move" data-action="k-cat" data-id="${c.id}" data-dir="1" ${ci === last ? 'disabled' : ''} aria-label="Flytta kategorin ${esc(c.name)} senare">↓</button></span></div>
+      <div class="grid">${ps.map((x, i) => tileEditHtml(x, c, i, ps.length)).join('') || '<div class="empty small">Inga produkter i kategorin.</div>'}</div></div>`;
+  });
+  const orphans = ui.cat === 'all' ? state.products.filter((x) => x.active !== false && catIndex(x.categoryId) === 9999) : [];
+  if (orphans.length) sections.push(`<div class="grid-section"><div class="grid-head"><b>Utan kategori</b></div><div class="grid">${orphans.map((x, i) => tileEditHtml(x, null, i, orphans.length)).join('')}</div></div>`);
+  return `<div class="order-note">Ändra ordning: flytta produkterna med pilarna på plattorna och kategorierna med pilarna vid rubriken. Tryck Klar när du är färdig.</div>${sections.join('')}`;
+}
+function moveVisible(id, dir) {
+  const p = state.products.find((x) => x.id === id); if (!p) return;
+  const siblings = state.products.filter((x) => x.categoryId === p.categoryId && x.active !== false);
+  const i = siblings.indexOf(p); const j = i + dir; if (j < 0 || j >= siblings.length) return;
+  const a = state.products.indexOf(p); const b = state.products.indexOf(siblings[j]);
+  [state.products[a], state.products[b]] = [state.products[b], state.products[a]];
+  save(); touchBackup(); updateGrid();
+}
+function rerenderKeepScroll() { const y = window.scrollY; render(); window.scrollTo(0, y); }
 function gridHtml() {
+  if (ui.editOrder) return gridEditHtml();
   const products = visibleProducts(); const inCart = cartQtyMap();
   if (!products.length) return `<div class="empty">${state.products.length ? 'Inga produkter matchar sökningen.' : 'Inga produkter ännu. Lägg till dem under Produkter.'}</div>`;
   const missing = state.products.filter((x) => x.active !== false && x.price == null).length;
@@ -597,7 +637,7 @@ function renderKassa() {
     state.categories.map((c) => `<button class="chip ${ui.cat === c.id && !q ? 'is-active' : ''}" style="--chip-ink:var(--cat-${c.color}-ink)" data-action="cat" data-id="${c.id}">${catArt(c, 'chip-art') || `<i class="dot" style="background:var(--cat-${c.color})"></i>`}${esc(c.name)}</button>`).join('');
   return `<section class="kassa ${ui.cartOpen ? 'cart-open' : ''}" id="kassa">
     <div class="products-pane">
-      <div class="cat-row">${chips}<label class="search"><input type="search" class="input" placeholder="Sök produkt" value="${esc(ui.search)}" data-role="search" aria-label="Sök produkt" autocomplete="off"></label></div>
+      <div class="cat-row">${chips}${ui.editOrder ? '' : `<label class="search"><input type="search" class="input" placeholder="Sök produkt" value="${esc(ui.search)}" data-role="search" aria-label="Sök produkt" autocomplete="off"></label>`}<button class="btn small order-btn ${ui.editOrder ? 'primary' : ''}" data-action="k-order" ${ui.editOrder ? 'style="margin-left:auto"' : ''}>${ui.editOrder ? 'Klar' : 'Ändra ordning'}</button></div>
       <div id="grid-wrap">${gridHtml()}</div>
     </div>
     <aside class="cart-pane" id="cart-pane" aria-label="Aktuellt köp">${cartInner()}</aside>
@@ -1638,7 +1678,10 @@ async function setPin() {
 
 // ---------- Actions ----------
 const actions = {
-  view: ({ id }) => { ui.view = id; ui.cartOpen = false; render(); },
+  view: ({ id }) => { ui.view = id; ui.cartOpen = false; ui.editOrder = false; render(); },
+  'k-order': () => { ui.editOrder = !ui.editOrder; ui.search = ''; rerenderKeepScroll(); if (!ui.editOrder) toast('Ordningen är sparad'); },
+  'k-move': ({ id, el }) => moveVisible(id, Number(el.dataset.dir)),
+  'k-cat': ({ id, el }) => { if (moveInArray(state.categories, state.categories.findIndex((c) => c.id === id), Number(el.dataset.dir))) { save(); touchBackup(); rerenderKeepScroll(); } },
   cat: ({ id }) => { ui.cat = id; ui.search = ''; const s = $('[data-role=search]'); if (s) s.value = ''; $$('.cat-row .chip').forEach((c) => c.classList.toggle('is-active', c.dataset.id === id)); updateGrid(); },
   add: ({ id }) => addToCart(id),
   inc: ({ i }) => { const l = state.cart.lines[i]; if (l) { l.qty += 1; save(); updateCart(); } },
