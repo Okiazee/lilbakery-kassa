@@ -389,7 +389,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const APP_DATE = '2026-10-10';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -490,7 +490,7 @@ const isTouch = () => navigator.maxTouchPoints > 1;
 
 // ---------- State ----------
 function defaultSettings() {
-  return { foretag: "lil'bakery", orgnr: '', adress: '', swish: '', kvittoText: 'Tack för ditt köp!', momsStandard: 6, pin: '', vaxelkassa: 500, driveUrl: '', driveKey: '', driveAuto: true };
+  return { foretag: "lil'bakery", orgnr: '', adress: '', swish: '', kvittoText: 'Tack för ditt köp!', epost: '', webb: '', momsStandard: 6, pin: '', vaxelkassa: 500, driveUrl: '', driveKey: '', driveAuto: true };
 }
 // Sortimentet från pop-up-menyn. Priser i hela kronor inklusive moms.
 const MENU_ID = 'popup-2026-10';
@@ -825,7 +825,7 @@ function renderKvitton() {
 }
 function receiptHtml(r) {
   const s = state.settings;
-  const meta = [s.orgnr ? `Org.nr ${esc(s.orgnr)}` : '', s.adress ? esc(s.adress) : ''].filter(Boolean).join(' · ');
+  const meta = [s.orgnr ? `Org.nr ${esc(s.orgnr)}` : '', s.adress ? esc(s.adress) : '', s.epost ? esc(s.epost) : '', s.webb ? esc(s.webb) : ''].filter(Boolean).join(' · ');
   return `<div class="paper ${r.status === 'makulerad' ? 'is-void' : ''}">
     <div class="paper-brand"><img src="img/logo.png" alt="${esc(s.foretag)}"></div>
     ${meta ? `<div class="paper-meta">${meta}</div>` : ''}
@@ -1230,7 +1230,7 @@ function renderInstallningar() {
   <div class="two-col">
     <div>
       <div class="card"><h2>Företag</h2>
-        ${f('foretag', 'Namn på kvittot')}${f('orgnr', 'Organisationsnummer', { attrs: 'inputmode="numeric" placeholder="XXXXXX-XXXX"' })}${f('adress', 'Adress eller ort', { attrs: 'placeholder="visas på kvittot"' })}
+        ${f('foretag', 'Namn på kvittot')}${f('orgnr', 'Organisationsnummer', { attrs: 'inputmode="numeric" placeholder="XXXXXX-XXXX"' })}${f('adress', 'Adress eller ort', { attrs: 'placeholder="visas på kvittot"' })}${f('epost', 'E-post på kvittot (valfritt)', { attrs: 'type="email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="t.ex. hej@lilbakery.se"' })}${f('webb', 'Webb eller Instagram på kvittot (valfritt)', { attrs: 'autocapitalize="off" spellcheck="false" placeholder="t.ex. instagram.com/lilbakery"' })}
         ${f('kvittoText', 'Hälsning längst ner på kvittot')}
       </div>
       <div class="card"><h2>Swish</h2>
@@ -1643,92 +1643,167 @@ function afterClosingSaved(day) {
 }
 
 // ---------- Kvitto som PDF och e-post ----------
-const pdfText = (t) => String(t ?? '').replace(/[\u2010-\u2015\u2212]/g, '-').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\u2026/g, '...').replace(/[^\x00-\xFF]/g, '');
+const PUBLIC_URL = 'https://okiazee.github.io/lilbakery-kassa/';
+const pdfText = (t) => String(t ?? '').replace(/\u2212/g, '-').replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F]/gu, '').trim();
+const pdfLatin = (t) => pdfText(t).replace(/[\u2010-\u2015]/g, '-').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\u2026/g, '...').replace(/[^\x00-\xFF]/g, '');
+const nf2 = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const kr2 = (n) => nf2.format(r2(n)).replace(/\u2212/g, '-') + ' kr';
+const longDate = (iso) => new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+const receiptContact = () => { const s = state.settings; return { line1: [s.foretag, s.orgnr ? `Org.nr ${s.orgnr}` : '', s.adress].filter(Boolean).join(' · '), line2: [s.epost, s.webb].filter(Boolean).join(' · ') }; };
 let logoCache = null;
 function logoForPdf() {
   if (!logoCache) logoCache = new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => { try { const w = 360; const h = Math.round(img.naturalHeight * w / img.naturalWidth); const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); resolve({ data: c.toDataURL('image/png'), ratio: h / w }); } catch (e) { resolve(null); } };
+    img.onload = () => { try { const w = 480; const h = Math.round(img.naturalHeight * w / img.naturalWidth); const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); resolve({ data: c.toDataURL('image/png'), ratio: h / w }); } catch (e) { resolve(null); } };
     img.onerror = () => resolve(null);
     img.src = 'img/logo.png';
   });
   return logoCache;
 }
-const PDF_W = 80; const PDF_M = 6;
-function drawReceipt(doc, r, logo, draw) {
-  const s = state.settings; const right = PDF_W - PDF_M; const cw = PDF_W - 2 * PDF_M; const mid = PDF_W / 2;
-  let y = PDF_M;
-  const txt = (t, x, opts) => { if (draw) doc.text(pdfText(t), x, y, opts || {}); };
-  const font = (style, size, color) => { doc.setFont('helvetica', style); doc.setFontSize(size); const c = color || [47, 74, 77]; doc.setTextColor(c[0], c[1], c[2]); };
-  const down = (gap) => { y += gap; };
-  const rule = () => { y += 1.5; if (draw) { doc.setDrawColor(169, 211, 214); doc.setLineDashPattern([1, 1], 0); doc.line(PDF_M, y, right, y); doc.setLineDashPattern([], 0); } y += 4.5; };
-  const wrap = (t, w) => doc.splitTextToSize(pdfText(t), w);
-  if (logo) { const w = 34; const h = w * logo.ratio; if (draw) doc.addImage(logo.data, 'PNG', (PDF_W - w) / 2, y, w, h, 'logo'); y += h + 4; }
-  else { font('bold', 14); down(5); txt(s.foretag, mid, { align: 'center' }); down(6); }
-  font('normal', 7.5, [109, 134, 136]);
-  const meta = [s.orgnr ? `Org.nr ${s.orgnr}` : '', s.adress].filter(Boolean).join(' · ');
-  if (meta) wrap(meta, cw).forEach((part) => { txt(part, mid, { align: 'center' }); down(3.4); });
-  txt(`Kvitto #${r.nr} · ${r.day} ${timeOf(r.ts)}`, mid, { align: 'center' }); down(3.4);
-  if (r.preorder) { font('bold', 7.5, [196, 83, 106]); txt(`Förbeställning F${r.preorder.nr} · ${r.preorder.name}`, mid, { align: 'center' }); down(3.4); }
-  if (r.status === 'makulerad') { font('bold', 11, [207, 75, 71]); down(2); txt('MAKULERAT', mid, { align: 'center' }); down(3); }
-  rule();
-  font('normal', 9);
-  r.lines.forEach((l) => wrap(`${l.qty} × ${l.name}`, cw - 20).forEach((part, i) => { txt(part, PDF_M); if (i === 0) txt(nf.format(r2(l.price * l.qty)), right, { align: 'right' }); down(4); }));
-  if (r.discount) wrap(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}${r.discount.reason ? `, ${r.discount.reason}` : ''}`, cw - 20).forEach((part, i) => { txt(part, PDF_M); if (i === 0) txt('-' + nf.format(r.discount.amount), right, { align: 'right' }); down(4); });
-  rule();
-  font('bold', 12); down(0.8); txt('Att betala', PDF_M); txt(kr(r.total), right, { align: 'right' }); down(5.5);
-  font('normal', 7.5, [109, 134, 136]);
-  r.vatLines.forEach((v) => { txt(`Varav moms ${v.rate} % (netto ${nf.format(v.net)})`, PDF_M); txt(nf.format(v.vat), right, { align: 'right' }); down(3.6); });
-  down(1.5); font('normal', 9);
-  txt('Betalsätt', PDF_M); txt(paymentName(r.payment), right, { align: 'right' }); down(4);
-  if (r.payment === 'kontant') { txt('Mottaget', PDF_M); txt(nf.format(r.received), right, { align: 'right' }); down(4); txt('Växel', PDF_M); txt(nf.format(r.change), right, { align: 'right' }); down(4); }
-  if (r.status === 'makulerad' && r.voided) { font('normal', 7.5, [207, 75, 71]); wrap(`Makulerat ${r.voided.ts.slice(0, 10)} ${timeOf(r.voided.ts)}${r.voided.reason ? `: ${r.voided.reason}` : ''}`, cw).forEach((part) => { txt(part, PDF_M); down(3.6); }); }
-  if (s.kvittoText) { down(2.5); font('italic', 9.5, [59, 122, 128]); wrap(s.kvittoText, cw).forEach((part) => { txt(part, mid, { align: 'center' }); down(4.2); }); }
-  return y + PDF_M - 2;
+let pdfFontsCache = null;
+function pdfFonts() {
+  if (!pdfFontsCache) {
+    pdfFontsCache = Promise.all(['Nunito-Regular', 'Nunito-ExtraBold', 'Sacramento-Regular'].map((n) => fetch(`vendor/fonts/${n}.ttf`)
+      .then((res) => { if (!res.ok) throw new Error(n); return res.arrayBuffer(); })
+      .then((buf) => { const b = new Uint8Array(buf); let str = ''; for (let i = 0; i < b.length; i += 0x8000) str += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return [n, str]; })))
+      .then((list) => Object.fromEntries(list))
+      .catch(() => { pdfFontsCache = null; return null; });
+  }
+  return pdfFontsCache;
+}
+function installPdfFonts(doc, fonts) {
+  if (!fonts) return { body: 'helvetica', script: 'helvetica', scriptStyle: 'italic', unicode: false };
+  doc.addFileToVFS('Nunito-Regular.ttf', fonts['Nunito-Regular']); doc.addFont('Nunito-Regular.ttf', 'Nunito', 'normal');
+  doc.addFileToVFS('Nunito-ExtraBold.ttf', fonts['Nunito-ExtraBold']); doc.addFont('Nunito-ExtraBold.ttf', 'Nunito', 'bold');
+  doc.addFileToVFS('Sacramento-Regular.ttf', fonts['Sacramento-Regular']); doc.addFont('Sacramento-Regular.ttf', 'Sacramento', 'normal');
+  return { body: 'Nunito', script: 'Sacramento', scriptStyle: 'normal', unicode: true };
+}
+const PAGE = { w: 148, h: 210, m: 14 };
+const COL = { ink: [47, 74, 77], muted: [109, 134, 136], brand: [59, 122, 128], pink: [196, 83, 106], red: [207, 75, 71], line: [217, 233, 234], mist: [243, 248, 248] };
+// Ritar ett kvitto på en A5-sida. Med D = false mäts bara höjden.
+function drawReceipt(doc, r, logo, F, D, pageH) {
+  const s = state.settings; const W = PAGE.w; const M = PAGE.m; const R = W - M; const CW = W - 2 * M; const T = F.unicode ? pdfText : pdfLatin;
+  const font = (bold, size, color) => { doc.setFont(F.body, bold ? 'bold' : 'normal'); doc.setFontSize(size); const c = color || COL.ink; doc.setTextColor(c[0], c[1], c[2]); };
+  const text = (t, x, y, opts) => { if (D) doc.text(T(t), x, y, opts || {}); };
+  const wrap = (t, w) => doc.splitTextToSize(T(t), w);
+  const hr = (y, c, lw) => { if (!D) return; const k = c || COL.line; doc.setDrawColor(k[0], k[1], k[2]); doc.setLineWidth(lw || 0.25); doc.line(M, y, R, y); };
+  const caps = (t, x, y, opts) => { doc.setCharSpace(0.5); text(t.toUpperCase(), x, y, opts); doc.setCharSpace(0); };
+  let y = M;
+  // Sidhuvud: logga till vänster, rubrik och nummer till höger
+  const logoW = 32; const logoH = logo ? logoW * logo.ratio : 0;
+  if (logo) { if (D) doc.addImage(logo.data, 'PNG', M - 1, y - 2, logoW, logoH, 'logo'); }
+  else { font(true, 18, COL.brand); text(s.foretag, M, y + 9); }
+  font(true, 26, COL.ink); text('Kvitto', R, y + 11, { align: 'right' });
+  font(false, 10, COL.muted); text(`nr ${r.nr}`, R, y + 17.5, { align: 'right' });
+  if (r.status === 'makulerad') {
+    font(true, 8.5, [255, 255, 255]); const lab = 'MAKULERAT'; const w = doc.getTextWidth(lab) + 6;
+    if (D) { doc.setFillColor(COL.red[0], COL.red[1], COL.red[2]); doc.roundedRect(R - w, y + 21, w, 6, 3, 3, 'F'); }
+    text(lab, R - w / 2, y + 25.1, { align: 'center' });
+  }
+  y += Math.max(logoH, 28) + 5;
+  // Säljare och kvittouppgifter
+  const colR = M + CW / 2 + 8;
+  font(true, 7, COL.muted); caps('Säljare', M, y); caps('Kvittouppgifter', colR, y);
+  let yl = y + 6; let yr = y + 6;
+  font(true, 11, COL.ink); text(s.foretag, M, yl); yl += 5.2;
+  font(false, 8.8, COL.muted);
+  [s.orgnr ? `Org.nr ${s.orgnr}` : '', s.adress, s.epost, s.webb].filter(Boolean).forEach((v) => wrap(v, CW / 2 - 2).forEach((part) => { text(part, M, yl); yl += 4.3; }));
+  const kv = (k, v) => { font(false, 8.8, COL.muted); text(k, colR, yr); font(true, 8.8, COL.ink); const parts = wrap(v, R - colR - 22); parts.forEach((part, i) => text(part, R, yr + i * 4.3, { align: 'right' })); yr += 4.3 * parts.length + 0.6; };
+  kv('Datum', longDate(r.ts)); kv('Tid', timeOf(r.ts)); kv('Betalsätt', paymentName(r.payment));
+  if (r.preorder) kv('Förbeställning', `F${r.preorder.nr}, ${r.preorder.name}`);
+  y = Math.max(yl, yr) + 5;
+  // Artiklar
+  const cA = M + 3; const cQty = M + 80; const cPrice = M + 100; const cSum = R - 3; const multiVat = r.vatLines.length > 1;
+  if (D) { doc.setFillColor(COL.mist[0], COL.mist[1], COL.mist[2]); doc.roundedRect(M, y, CW, 8, 2, 2, 'F'); }
+  font(true, 7, COL.muted); caps('Artikel', cA, y + 5.2); caps('Antal', cQty, y + 5.2, { align: 'right' }); caps('À-pris', cPrice, y + 5.2, { align: 'right' }); caps('Belopp', cSum, y + 5.2, { align: 'right' });
+  y += 8;
+  r.lines.forEach((l) => {
+    font(false, 9.8, COL.ink); const parts = wrap(l.name, cQty - cA - 14); const ty = y + 5.6;
+    parts.forEach((part, i) => text(part, cA, ty + i * 4.5));
+    text(String(l.qty), cQty, ty, { align: 'right' }); text(nf2.format(l.price), cPrice, ty, { align: 'right' });
+    font(true, 9.8, COL.ink); text(nf2.format(r2(l.price * l.qty)), cSum, ty, { align: 'right' });
+    let extra = 0; if (multiVat) { font(false, 7.8, COL.muted); text(`moms ${l.vat} %`, cA, ty + parts.length * 4.5 - 0.6); extra = 3.6; }
+    y += 4.5 * parts.length + 3.6 + extra; hr(y);
+  });
+  if (r.discount) {
+    font(false, 9.8, COL.pink); const lab = `Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}${r.discount.reason ? ` · ${r.discount.reason}` : ''}`;
+    const parts = wrap(lab, cQty - cA - 12); const ty = y + 5.6;
+    parts.forEach((part, i) => text(part, cA, ty + i * 4.5)); font(true, 9.8, COL.pink); text('-' + nf2.format(r.discount.amount), cSum, ty, { align: 'right' });
+    y += 4.5 * parts.length + 3.6; hr(y);
+  }
+  // Summering till höger
+  y += 8; const tx = colR;
+  const row = (k, v, size, color, bold) => { font(!!bold, size, color || COL.muted); text(k, tx, y); text(v, cSum, y, { align: 'right' }); };
+  if (r.discount) { row('Summa artiklar', kr2(r.gross), 9); y += 5; row(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}`, '-' + kr2(r.discount.amount), 9, COL.pink); y += 5; }
+  if (D) { doc.setDrawColor(COL.brand[0], COL.brand[1], COL.brand[2]); doc.setLineWidth(0.5); doc.line(tx, y - 1, R, y - 1); }
+  y += 6.5; row('Att betala', kr2(r.total), 14, COL.brand, true); y += 7;
+  r.vatLines.forEach((v) => { row(`Varav moms ${v.rate} %`, kr2(v.vat), 8.6); y += 4.6; });
+  row('Belopp exkl. moms', kr2(sum(r.vatLines, (v) => v.net)), 8.6); y += 4.6;
+  if (r.payment === 'kontant') { y += 1.5; row('Mottaget kontant', kr2(r.received), 8.6); y += 4.6; row('Växel', kr2(r.change), 8.6); y += 4.6; }
+  else { y += 1.5; row('Betalt med', paymentName(r.payment), 8.6); y += 4.6; }
+  if (r.status === 'makulerad' && r.voided) { y += 3; font(false, 8.6, COL.red); wrap(`Kvittot makulerades ${r.voided.ts.slice(0, 10)} ${timeOf(r.voided.ts)}${r.voided.reason ? `: ${r.voided.reason}` : ''}`, CW).forEach((part) => { text(part, M, y); y += 4.4; }); }
+  // Hälsning
+  if (s.kvittoText) { y += 11; doc.setFont(F.script, F.scriptStyle); doc.setFontSize(F.unicode ? 26 : 14); doc.setTextColor(COL.brand[0], COL.brand[1], COL.brand[2]); wrap(s.kvittoText, CW).forEach((part) => { text(part, W / 2, y, { align: 'center' }); y += F.unicode ? 9 : 6; }); }
+  // Sidfot längst ned
+  const H = pageH || PAGE.h; const c = receiptContact(); const fy = Math.max(y + 10, H - (c.line2 ? 15 : 12));
+  hr(fy - 5);
+  font(false, 7.6, COL.muted); text(c.line1, W / 2, fy, { align: 'center' }); if (c.line2) text(c.line2, W / 2, fy + 3.8, { align: 'center' });
+  return fy + (c.line2 ? 3.8 : 0) + 8;
 }
 async function receiptsPdfBlob(list) {
   await loadScript('vendor/jspdf.umd.min.js');
-  const { jsPDF } = window.jspdf; const logo = await logoForPdf();
-  const meas = new jsPDF({ unit: 'mm', format: [PDF_W, 300], orientation: 'p' });
-  const heights = list.map((r) => Math.max(PDF_W + 20, Math.ceil(drawReceipt(meas, r, logo, false))));
-  const doc = new jsPDF({ unit: 'mm', format: [PDF_W, heights[0]], orientation: 'p', compress: true });
-  doc.setProperties({ title: list.length === 1 ? `Kvitto ${list[0].nr}` : 'Kvitton', author: pdfText(state.settings.foretag), creator: "lil'bakery Kassa" });
-  list.forEach((r, i) => { if (i) doc.addPage([PDF_W, heights[i]], 'p'); drawReceipt(doc, r, logo, true); });
+  const { jsPDF } = window.jspdf; const [logo, fonts] = await Promise.all([logoForPdf(), pdfFonts()]);
+  const meas = new jsPDF({ unit: 'mm', format: [PAGE.w, 600], orientation: 'p' }); const Fm = installPdfFonts(meas, fonts);
+  const heights = list.map((r) => Math.max(PAGE.h, Math.ceil(drawReceipt(meas, r, logo, Fm, false, PAGE.h))));
+  const doc = new jsPDF({ unit: 'mm', format: [PAGE.w, heights[0]], orientation: 'p', compress: true }); const F = installPdfFonts(doc, fonts);
+  doc.setProperties({ title: list.length === 1 ? `Kvitto ${list[0].nr} från ${state.settings.foretag}` : `Kvitton från ${state.settings.foretag}`, author: state.settings.foretag, creator: "lil'bakery Kassa" });
+  list.forEach((r, i) => { if (i) doc.addPage([PAGE.w, heights[i]], 'p'); drawReceipt(doc, r, logo, F, true, heights[i]); });
   return doc.output('blob');
 }
 const receiptFileName = (r) => `kvitto-${r.nr}-${r.day}.pdf`;
 function receiptPlainText(r) {
-  const s = state.settings; const L = [`Kvitto #${r.nr} från ${s.foretag}`, `${r.day} ${timeOf(r.ts)}`];
-  if (r.preorder) L.push(`Förbeställning F${r.preorder.nr}, ${r.preorder.name}`);
-  L.push('');
-  r.lines.forEach((l) => L.push(`${l.qty} × ${l.name}: ${kr(l.price * l.qty)}`));
-  if (r.discount) L.push(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}: -${kr(r.discount.amount)}`);
-  L.push('', `Att betala: ${kr(r.total)}`);
-  r.vatLines.forEach((v) => L.push(`Varav moms ${v.rate} %: ${kr(v.vat)} (netto ${kr(v.net)})`));
-  L.push(`Betalsätt: ${paymentName(r.payment)}`);
-  if (r.payment === 'kontant') L.push(`Mottaget: ${kr(r.received)}`, `Växel: ${kr(r.change)}`);
+  const s = state.settings; const c = receiptContact();
+  const L = [`Kvitto från ${s.foretag}`, '', `Kvittonummer: ${r.nr}`, `Datum: ${longDate(r.ts)} kl. ${timeOf(r.ts)}`, `Betalsätt: ${paymentName(r.payment)}`];
+  if (r.preorder) L.push(`Förbeställning: F${r.preorder.nr}, ${r.preorder.name}`);
+  L.push('', 'Artiklar');
+  r.lines.forEach((l) => L.push(`${l.qty} × ${l.name} (${kr2(l.price)}/st): ${kr2(l.price * l.qty)}`));
+  if (r.discount) L.push(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}${r.discount.reason ? `, ${r.discount.reason}` : ''}: -${kr2(r.discount.amount)}`);
+  L.push('', `Att betala: ${kr2(r.total)}`);
+  r.vatLines.forEach((v) => L.push(`Varav moms ${v.rate} %: ${kr2(v.vat)}`));
+  L.push(`Belopp exkl. moms: ${kr2(sum(r.vatLines, (v) => v.net))}`);
+  if (r.payment === 'kontant') L.push(`Mottaget kontant: ${kr2(r.received)}`, `Växel: ${kr2(r.change)}`);
   if (s.kvittoText) L.push('', s.kvittoText);
-  L.push('', [s.foretag, s.orgnr ? `Org.nr ${s.orgnr}` : '', s.adress].filter(Boolean).join(' · '));
+  L.push('', c.line1); if (c.line2) L.push(c.line2);
   return L.join('\n');
 }
 function receiptMailHtml(r) {
-  const s = state.settings; const td = 'padding:5px 0;border-bottom:1px solid #d9e9ea;';
-  const row = (a, b, extra = '') => `<tr><td style="${td}${extra}">${a}</td><td style="${td}${extra}text-align:right;white-space:nowrap">${b}</td></tr>`;
-  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#2f4a4d;max-width:420px;margin:0 auto">
-<h2 style="color:#3b7a80;margin:0 0 4px">${esc(s.foretag)}</h2>
-<p style="margin:0 0 12px;color:#6d8688">Kvitto #${r.nr} · ${r.day} ${timeOf(r.ts)}${r.preorder ? `<br>Förbeställning F${r.preorder.nr} · ${esc(r.preorder.name)}` : ''}</p>
-<table style="width:100%;border-collapse:collapse;font-size:14px">
-${r.lines.map((l) => row(`${l.qty} × ${esc(l.name)}`, esc(kr(l.price * l.qty)))).join('')}
-${r.discount ? row(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}`, '-' + esc(kr(r.discount.amount))) : ''}
-${row('<b>Att betala</b>', `<b>${esc(kr(r.total))}</b>`, 'font-size:16px;')}
-${r.vatLines.map((v) => row(`Varav moms ${v.rate} % (netto ${esc(kr(v.net))})`, esc(kr(v.vat)), 'color:#6d8688;font-size:12px;')).join('')}
-${row('Betalsätt', esc(paymentName(r.payment)))}
-${r.payment === 'kontant' ? row('Mottaget', esc(kr(r.received))) + row('Växel', esc(kr(r.change))) : ''}
-</table>
-${s.kvittoText ? `<p style="color:#3b7a80;font-style:italic;text-align:center;margin:16px 0 4px">${esc(s.kvittoText)}</p>` : ''}
-<p style="color:#6d8688;font-size:12px;text-align:center;margin:8px 0 0">${esc([s.foretag, s.orgnr ? `Org.nr ${s.orgnr}` : '', s.adress].filter(Boolean).join(' · '))}</p>
-<p style="color:#6d8688;font-size:12px;text-align:center;margin:4px 0 0">Kvittot finns också som PDF i bilagan.</p>
-</div>`;
+  const s = state.settings; const c = receiptContact();
+  const C = { ink: '#2f4a4d', muted: '#6d8688', brand: '#3b7a80', line: '#d9e9ea', mist: '#f3f8f8', pink: '#c4536a', red: '#cf4b47' };
+  const td = (t, st = '') => `<td style="padding:11px 0;border-bottom:1px solid ${C.line};font-size:15px;line-height:1.4;${st}">${t}</td>`;
+  const items = r.lines.map((l) => `<tr>${td(`${esc(l.name)}<div style="color:${C.muted};font-size:13px;margin-top:2px">${l.qty} × ${esc(kr2(l.price))} · moms ${l.vat} %</div>`)}${td(esc(kr2(l.price * l.qty)), 'text-align:right;white-space:nowrap;vertical-align:top;font-weight:bold')}</tr>`).join('');
+  const disc = r.discount ? `<tr>${td(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}${r.discount.reason ? ` · ${esc(r.discount.reason)}` : ''}`, `color:${C.pink}`)}${td('-' + esc(kr2(r.discount.amount)), `text-align:right;white-space:nowrap;color:${C.pink};font-weight:bold`)}</tr>` : '';
+  const sm = (k, v, st = '') => `<tr><td style="padding:3px 0;font-size:13px;color:${C.muted};${st}">${k}</td><td style="padding:3px 0;font-size:13px;color:${C.muted};text-align:right;white-space:nowrap;${st}">${v}</td></tr>`;
+  const sums = (r.discount ? sm('Summa artiklar', esc(kr2(r.gross))) : '')
+    + `<tr><td style="padding:10px 0 6px;font-size:19px;font-weight:bold;color:${C.brand}">Att betala</td><td style="padding:10px 0 6px;font-size:19px;font-weight:bold;color:${C.brand};text-align:right;white-space:nowrap">${esc(kr2(r.total))}</td></tr>`
+    + r.vatLines.map((v) => sm(`Varav moms ${v.rate} %`, esc(kr2(v.vat)))).join('')
+    + sm('Belopp exkl. moms', esc(kr2(sum(r.vatLines, (v) => v.net))))
+    + (r.payment === 'kontant' ? sm('Mottaget kontant', esc(kr2(r.received))) + sm('Växel', esc(kr2(r.change))) : sm('Betalt med', esc(paymentName(r.payment))));
+  return `<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Kvitto ${r.nr}</title></head>
+<body style="margin:0;padding:0;background:${C.mist}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.mist}"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid ${C.line};border-radius:18px;font-family:Arial,Helvetica,sans-serif;color:${C.ink}">
+<tr><td style="padding:30px 32px 4px;text-align:center"><img src="${PUBLIC_URL}img/logo.png" width="130" alt="${esc(s.foretag)}" style="display:inline-block;width:130px;max-width:130px;height:auto;border:0"></td></tr>
+<tr><td style="padding:10px 32px 22px;text-align:center">
+<div style="font-size:24px;font-weight:bold;color:${C.ink}">${esc(s.kvittoText || 'Ditt kvitto')}</div>
+<div style="font-size:14px;color:${C.muted};margin-top:8px">Kvitto nr ${r.nr} · ${esc(longDate(r.ts))} kl. ${timeOf(r.ts)}</div>
+${r.preorder ? `<div style="font-size:14px;color:${C.pink};margin-top:4px;font-weight:bold">Förbeställning F${r.preorder.nr} · ${esc(r.preorder.name)}</div>` : ''}
+${r.status === 'makulerad' ? `<div style="display:inline-block;margin-top:10px;padding:4px 12px;border-radius:999px;background:${C.red};color:#fff;font-size:12px;font-weight:bold;letter-spacing:1px">MAKULERAT</div>` : ''}
+</td></tr>
+<tr><td style="padding:0 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${C.line}">${items}${disc}</table></td></tr>
+<tr><td style="padding:12px 32px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${sums}</table></td></tr>
+<tr><td style="padding:22px 32px 26px;text-align:center;font-size:13px;color:${C.muted};line-height:1.6">Kvittot finns också som PDF i bilagan. Spara det som köpbevis.</td></tr>
+<tr><td style="padding:18px 32px 22px;border-top:1px solid ${C.line};background:${C.mist};border-radius:0 0 18px 18px;text-align:center;font-size:12px;color:${C.muted};line-height:1.7">${esc(c.line1)}${c.line2 ? `<br>${esc(c.line2)}` : ''}</td></tr>
+</table></td></tr></table></body></html>`;
 }
 const blobToBase64 = (blob) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
 async function deliverFile(blob, name) {

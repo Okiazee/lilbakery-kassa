@@ -104,7 +104,7 @@ kopian till en annan enhet.
 
 Öppna ett kvitto under *Kvitton*, eller tryck *Mejla kvitto* direkt efter köpet.
 
-- **Ladda ner** skapar kvittot som PDF i kvittoformat, 80 mm brett, med logga.
+- **Ladda ner** skapar kvittot som ett PDF-dokument i A5 med logga, säljaruppgifter, artikeltabell, moms och betalning.
   På iPad öppnas delningsmenyn med Spara i Filer, Mail, AirDrop och Skriv ut.
   På datorn laddas filen ner.
 - **Ladda ner PDF** i kvittolistan samlar dagens kvitton, eller alla kvitton,
