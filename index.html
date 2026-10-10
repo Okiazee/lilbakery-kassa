@@ -389,8 +389,8 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.5.0';
-const APP_DATE = '2026-10-04';
+const APP_VERSION = '1.6.0';
+const APP_DATE = '2026-10-10';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
 const CAT_COLORS = ['butter', 'pink', 'peach', 'blue', 'mint', 'lavender'];
@@ -804,17 +804,22 @@ function receiptRow(r) {
   const items = r.lines.map((l) => (l.qty > 1 ? l.qty + ' × ' : '') + esc(l.name)).join(', ');
   return `<button class="row" data-action="show-receipt" data-id="${r.id}"><span class="row-nr">#${r.nr}</span><span class="row-main"><b>${timeOf(r.ts)}</b> · ${items}</span><span class="row-side">${r.preorder ? '<span class="badge po">Förbeställning</span>' : ''}<span class="badge ${r.payment}">${paymentName(r.payment)}</span>${r.status === 'makulerad' ? '<span class="badge void">Makulerad</span>' : ''}<b class="row-sum ${r.status === 'makulerad' ? 'strike' : ''}">${kr(r.total)}</b></span></button>`;
 }
-function renderKvitton() {
+function kvittoList() {
   const q = ui.kvittoSearch.trim().toLowerCase();
   let list = state.receipts.slice().sort((a, b) => b.ts.localeCompare(a.ts));
   if (!ui.kvittoAll) list = list.filter((r) => r.day === ui.kvittoDay);
   if (q) list = list.filter((r) => String(r.nr) === q.replace('#', '') || r.lines.some((l) => l.name.toLowerCase().includes(q)) || (r.preorder && r.preorder.name.toLowerCase().includes(q)));
+  return list;
+}
+function renderKvitton() {
+  const list = kvittoList();
   const groups = new Map(); list.forEach((r) => { if (!groups.has(r.day)) groups.set(r.day, []); groups.get(r.day).push(r); });
   const html = [...groups.entries()].map(([day, rs]) => { const ok = rs.filter((r) => r.status === 'ok'); return `<div class="group"><div class="group-head"><b>${esc(fmtDay(day))}</b><span>${ok.length} ${ok.length === 1 ? 'kvitto' : 'kvitton'} · ${kr(sum(ok, (r) => r.total))}</span></div><div class="list">${rs.map(receiptRow).join('')}</div></div>`; }).join('');
   return `<div class="page-head"><h1>Kvitton</h1><div class="toolbar">
       <input type="date" class="input" value="${ui.kvittoDay}" data-role="kvitto-day" ${ui.kvittoAll ? 'disabled' : ''} aria-label="Datum">
       <label class="check"><input type="checkbox" data-role="kvitto-all" ${ui.kvittoAll ? 'checked' : ''}> Alla dagar</label>
       <input type="search" class="input" placeholder="Sök kvittonr eller produkt" value="${esc(ui.kvittoSearch)}" data-role="kvitto-search" aria-label="Sök kvitto" autocomplete="off">
+      <button class="btn" data-action="receipts-pdf" ${list.length ? '' : 'disabled'}>Ladda ner PDF</button>
     </div></div>
     ${html || `<div class="empty">${state.receipts.length ? 'Inga kvitton matchar.' : 'Inga kvitton ännu. De sparas här automatiskt när du slutför ett köp.'}</div>`}`;
 }
@@ -1252,7 +1257,7 @@ function renderInstallningar() {
         <div class="btn-row"><button class="btn danger-ghost" data-action="wipe">Radera alla kvitton och dagsavslut</button></div>
       </div>
       <div class="card"><h2>Google Drive</h2>
-        <p class="fine">Kassan kan skicka en kopia till din Google Drive automatiskt efter varje köp och dagsavslut. Det sker genom ett litet skript i ditt eget Google-konto, så ingen annan får tillgång till uppgifterna.</p>
+        <p class="fine">Kassan kan skicka en kopia till din Google Drive automatiskt efter varje köp och dagsavslut, och mejla kvitton till kunder. Det sker genom ett litet skript i ditt eget Google-konto, så ingen annan får tillgång till uppgifterna.</p>
         <div id="drive-status" class="status-line ${driveStatus().cls}">${esc(driveStatus().text)}</div>
         ${f('driveUrl', 'Webbappens adress (slutar på /exec)', { attrs: 'inputmode="url" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"' })}
         ${f('driveKey', 'Nyckel, samma som i skriptet', { attrs: 'spellcheck="false"' })}
@@ -1267,6 +1272,7 @@ function renderInstallningar() {
             <li>Godkänn åtkomsten: välj ditt konto, klicka <b>Avancerat</b>, sedan <i>Fortsätt till projektet (osäkert)</i> och <b>Tillåt</b>. Varningen visas för att skriptet är ditt eget och inte granskat av Google.</li>
             <li>Kopiera <b>webbappens webbadress</b>, klistra in den i fältet ovan och tryck <b>Testa anslutningen</b>.</li>
             <li>Ändrar du skriptet senare: Distribuera, <b>Hantera distributioner</b>, pennan, Version: <b>Ny version</b>, Distribuera. Adressen förblir densamma.</li>
+            <li><b>Mejla kvitton:</b> har du kopplat Drive före version 1.6, ersätt koden i skriptet med den nya nedan, spara, och gör en ny version enligt punkten ovan. Godkänn att skriptet får skicka e-post. Testa anslutningen visar sedan att kvitton kan mejlas.</li>
           </ol>
           <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV.</p>
           <div class="btn-row"><button class="btn" data-action="copy-script">Kopiera skriptet</button></div>
@@ -1297,6 +1303,7 @@ function saveSetting(key, el, quiet = false) {
   else if (key === 'driveKey') v = String(v).replace(/[^\w-]/g, '');
   else if (typeof v === 'string') v = v.trim();
   state.settings[key] = v; save(); if (!quiet) toast('Sparat');
+  if (key === 'driveUrl' || key === 'driveKey') driveMailCapable = null;
   if (key.startsWith('drive')) { updateDriveStatus(); if (key === 'driveKey') { const pre = $('#drive-script'); if (pre) pre.textContent = driveScriptText(); } }
   else touchBackup();
 }
@@ -1479,14 +1486,19 @@ function finalizeSale(payment, received) {
   setCartOpen(false); updateCart(); renderNav(); showDone(receipt);
 }
 function showDone(r) {
-  const m = openModal({ cls: 'modal-done', dismissable: false, body: `<div class="done"><div class="done-title">Tack!</div><div class="done-sum">${kr(r.total)} · ${paymentName(r.payment)}</div>${r.payment === 'kontant' && r.change > 0 ? `<div class="done-change"><span>Växel tillbaka</span><b>${kr(r.change)}</b></div>` : ''}<div class="done-nr">Kvitto #${r.nr} sparat</div></div>`, footer: `<button class="btn ghost" data-show>Visa kvitto</button><button class="btn primary big" data-close>Nästa kund</button>` });
+  const m = openModal({ cls: 'modal-done', dismissable: false, body: `<div class="done"><div class="done-title">Tack!</div><div class="done-sum">${kr(r.total)} · ${paymentName(r.payment)}</div>${r.payment === 'kontant' && r.change > 0 ? `<div class="done-change"><span>Växel tillbaka</span><b>${kr(r.change)}</b></div>` : ''}<div class="done-nr">Kvitto #${r.nr} sparat</div></div>`, footer: `<button class="btn ghost" data-show>Visa kvitto</button><button class="btn ghost" data-mail>Mejla kvitto</button><button class="btn primary big" data-close>Nästa kund</button>` });
   $('[data-show]', m.el).addEventListener('click', () => { m.close(); showReceipt(r.id); });
+  $('[data-mail]', m.el).addEventListener('click', () => { m.close(); mailReceiptDialog(r); });
   setTimeout(() => $('[data-close]', m.el)?.focus(), 50);
 }
 function showReceipt(id) {
   const r = state.receipts.find((x) => x.id === id); if (!r) return;
-  const m = openModal({ title: `Kvitto #${r.nr}`, body: receiptHtml(r), footer: `${r.status === 'ok' ? '<button class="btn danger-ghost" data-void>Makulera</button>' : ''}<button class="btn primary" data-close>Stäng</button>` });
+  const last = r.mailed && r.mailed.length ? r.mailed[r.mailed.length - 1] : null;
+  const m = openModal({ title: `Kvitto #${r.nr}`, body: receiptHtml(r) + (last ? `<p class="hint" style="text-align:center">Mejlat till ${esc(last.to)}, ${last.at.slice(0, 10)} ${timeOf(last.at)}</p>` : ''), footer: `${r.status === 'ok' ? '<button class="btn danger-ghost" data-void>Makulera</button>' : ''}<button class="btn" data-pdf>Ladda ner</button>${r.status === 'ok' ? '<button class="btn" data-mail>Mejla</button>' : ''}<button class="btn primary" data-close>Stäng</button>` });
+  const pdfP = IN_PREVIEW ? null : receiptsPdfBlob([r]); if (pdfP) pdfP.catch(() => {});
   $('[data-void]', m.el)?.addEventListener('click', async () => { m.close(); await voidReceipt(r.id); });
+  $('[data-pdf]', m.el).addEventListener('click', () => downloadReceipt(r, pdfP));
+  $('[data-mail]', m.el)?.addEventListener('click', () => { m.close(); mailReceiptDialog(r); });
 }
 async function voidReceipt(id) {
   const r = state.receipts.find((x) => x.id === id); if (!r || r.status !== 'ok') return;
@@ -1506,7 +1518,7 @@ const PREVIEW_MSG = 'Det här är förhandsvisningen på claude.ai, och den får
 function driveConfigured() { return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec\/?$/.test((state.settings.driveUrl || '').trim()); }
 function backupObject() { return { app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }; }
 function driveScriptText() {
-  return `// lil'bakery Kassa: tar emot säkerhetskopior från kassan och sparar dem på Google Drive.
+  return `// lil'bakery Kassa, version 2: sparar säkerhetskopior på Google Drive och mejlar kvitton.
 const NYCKEL = '${state.settings.driveKey || ''}';   // samma nyckel som i kassans inställningar
 const MAPP = "lil'bakery Kassa";        // mappen skapas i Min enhet på Google Drive
 
@@ -1514,6 +1526,8 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     if (data.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
+    if (data.action === 'mail') return skickaKvitto(data);
+    if (!data.backup || typeof data.backup !== 'object') return svar({ ok: false, error: 'Kopian saknas' });
     const mapp = hamtaMapp();
     const dag = data.day || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     const json = JSON.stringify(data.backup);
@@ -1525,10 +1539,17 @@ function doPost(e) {
 }
 function doGet(e) {
   if (!e.parameter || e.parameter.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
+  if (e.parameter.action === 'ping') return svar({ ok: true, mail: true, version: 2 });
   const filer = hamtaMapp().getFilesByName('kassa-backup-senaste.json');
   if (!filer.hasNext()) return svar({ ok: false, error: 'Ingen kopia finns' });
   const fil = filer.next();
   return svar({ ok: true, updated: fil.getLastUpdated().toISOString(), backup: JSON.parse(fil.getBlob().getDataAsString()) });
+}
+function skickaKvitto(data) {
+  if (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(data.to || '')) return svar({ ok: false, error: 'Ogiltig e-postadress' });
+  const bilagor = data.pdf ? [Utilities.newBlob(Utilities.base64Decode(data.pdf), 'application/pdf', data.filename || 'kvitto.pdf')] : [];
+  MailApp.sendEmail({ to: data.to, subject: data.subject || 'Kvitto', body: data.text || '', htmlBody: data.html || undefined, name: data.from || "lil'bakery", attachments: bilagor });
+  return svar({ ok: true, sent: new Date().toISOString() });
 }
 function hamtaMapp() { const it = DriveApp.getFoldersByName(MAPP); return it.hasNext() ? it.next() : DriveApp.createFolder(MAPP); }
 function skriv(mapp, namn, innehall) { const it = mapp.getFilesByName(namn); if (it.hasNext()) it.next().setContent(innehall); else mapp.createFile(namn, innehall, MimeType.PLAIN_TEXT); }
@@ -1598,11 +1619,13 @@ function driveUrlProblem() {
 async function driveTest() {
   const problem = driveUrlProblem(); if (problem) { toast(problem, 'bad', { duration: 15000 }); return; }
   try {
-    const json = await driveFetchLatest();
-    if (json.ok) toast(`Anslutningen fungerar. Senaste kopia på Drive: ${json.updated.slice(0, 10)} ${timeOf(json.updated)}`);
-    else if (json.error === 'Ingen kopia finns') toast('Anslutningen fungerar. Ingen kopia har skickats ännu.');
+    const json = await driveFetchLatest(); let msg;
+    if (json.ok) msg = json.updated ? `Anslutningen fungerar. Senaste kopia på Drive: ${json.updated.slice(0, 10)} ${timeOf(json.updated)}.` : 'Anslutningen fungerar.';
+    else if (json.error === 'Ingen kopia finns') msg = 'Anslutningen fungerar. Ingen kopia har skickats ännu.';
     else if (json.error === 'Fel nyckel') throw new Error('Skriptet svarar men nyckeln stämmer inte. Nyckeln i fältet ovan måste vara exakt samma som NYCKEL i skriptet.');
     else throw new Error(json.error || 'Skriptet svarade med fel');
+    driveMailCapable = null; let canMail = false; try { canMail = await driveCanMail(); } catch (e) { canMail = false; }
+    toast(msg + (canMail ? ' Kvitton kan mejlas.' : ' För att mejla kvitton behöver skriptet uppdateras, se instruktionen nedan.'), 'ok', { duration: 10000 });
   } catch (e) { toast('Anslutningen misslyckades: ' + friendlyDriveError(e), 'bad', { duration: 12000 }); }
 }
 async function driveRestore() {
@@ -1617,6 +1640,158 @@ function afterClosingSaved(day) {
   if (driveConfigured() && state.settings.driveAuto) { touchBackup({ csvDay: day, now: true }); toast('Dagsavslut sparat. Kopia skickas till Google Drive.'); }
   else if (driveConfigured()) { state.meta.driveCsvDay = day; save(); toast('Dagsavslut sparat. Tryck Kopiera nu under Inställningar för att skicka till Drive.'); }
   else toast('Dagsavslut sparat. Kom ihåg att spara en säkerhetskopia under Inställningar.', 'ok', { duration: 6000 });
+}
+
+// ---------- Kvitto som PDF och e-post ----------
+const pdfText = (t) => String(t ?? '').replace(/[\u2010-\u2015\u2212]/g, '-').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\u2026/g, '...').replace(/[^\x00-\xFF]/g, '');
+let logoCache = null;
+function logoForPdf() {
+  if (!logoCache) logoCache = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => { try { const w = 360; const h = Math.round(img.naturalHeight * w / img.naturalWidth); const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); resolve({ data: c.toDataURL('image/png'), ratio: h / w }); } catch (e) { resolve(null); } };
+    img.onerror = () => resolve(null);
+    img.src = 'img/logo.png';
+  });
+  return logoCache;
+}
+const PDF_W = 80; const PDF_M = 6;
+function drawReceipt(doc, r, logo, draw) {
+  const s = state.settings; const right = PDF_W - PDF_M; const cw = PDF_W - 2 * PDF_M; const mid = PDF_W / 2;
+  let y = PDF_M;
+  const txt = (t, x, opts) => { if (draw) doc.text(pdfText(t), x, y, opts || {}); };
+  const font = (style, size, color) => { doc.setFont('helvetica', style); doc.setFontSize(size); const c = color || [47, 74, 77]; doc.setTextColor(c[0], c[1], c[2]); };
+  const down = (gap) => { y += gap; };
+  const rule = () => { y += 1.5; if (draw) { doc.setDrawColor(169, 211, 214); doc.setLineDashPattern([1, 1], 0); doc.line(PDF_M, y, right, y); doc.setLineDashPattern([], 0); } y += 4.5; };
+  const wrap = (t, w) => doc.splitTextToSize(pdfText(t), w);
+  if (logo) { const w = 34; const h = w * logo.ratio; if (draw) doc.addImage(logo.data, 'PNG', (PDF_W - w) / 2, y, w, h, 'logo'); y += h + 4; }
+  else { font('bold', 14); down(5); txt(s.foretag, mid, { align: 'center' }); down(6); }
+  font('normal', 7.5, [109, 134, 136]);
+  const meta = [s.orgnr ? `Org.nr ${s.orgnr}` : '', s.adress].filter(Boolean).join(' · ');
+  if (meta) wrap(meta, cw).forEach((part) => { txt(part, mid, { align: 'center' }); down(3.4); });
+  txt(`Kvitto #${r.nr} · ${r.day} ${timeOf(r.ts)}`, mid, { align: 'center' }); down(3.4);
+  if (r.preorder) { font('bold', 7.5, [196, 83, 106]); txt(`Förbeställning F${r.preorder.nr} · ${r.preorder.name}`, mid, { align: 'center' }); down(3.4); }
+  if (r.status === 'makulerad') { font('bold', 11, [207, 75, 71]); down(2); txt('MAKULERAT', mid, { align: 'center' }); down(3); }
+  rule();
+  font('normal', 9);
+  r.lines.forEach((l) => wrap(`${l.qty} × ${l.name}`, cw - 20).forEach((part, i) => { txt(part, PDF_M); if (i === 0) txt(nf.format(r2(l.price * l.qty)), right, { align: 'right' }); down(4); }));
+  if (r.discount) wrap(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}${r.discount.reason ? `, ${r.discount.reason}` : ''}`, cw - 20).forEach((part, i) => { txt(part, PDF_M); if (i === 0) txt('-' + nf.format(r.discount.amount), right, { align: 'right' }); down(4); });
+  rule();
+  font('bold', 12); down(0.8); txt('Att betala', PDF_M); txt(kr(r.total), right, { align: 'right' }); down(5.5);
+  font('normal', 7.5, [109, 134, 136]);
+  r.vatLines.forEach((v) => { txt(`Varav moms ${v.rate} % (netto ${nf.format(v.net)})`, PDF_M); txt(nf.format(v.vat), right, { align: 'right' }); down(3.6); });
+  down(1.5); font('normal', 9);
+  txt('Betalsätt', PDF_M); txt(paymentName(r.payment), right, { align: 'right' }); down(4);
+  if (r.payment === 'kontant') { txt('Mottaget', PDF_M); txt(nf.format(r.received), right, { align: 'right' }); down(4); txt('Växel', PDF_M); txt(nf.format(r.change), right, { align: 'right' }); down(4); }
+  if (r.status === 'makulerad' && r.voided) { font('normal', 7.5, [207, 75, 71]); wrap(`Makulerat ${r.voided.ts.slice(0, 10)} ${timeOf(r.voided.ts)}${r.voided.reason ? `: ${r.voided.reason}` : ''}`, cw).forEach((part) => { txt(part, PDF_M); down(3.6); }); }
+  if (s.kvittoText) { down(2.5); font('italic', 9.5, [59, 122, 128]); wrap(s.kvittoText, cw).forEach((part) => { txt(part, mid, { align: 'center' }); down(4.2); }); }
+  return y + PDF_M - 2;
+}
+async function receiptsPdfBlob(list) {
+  await loadScript('vendor/jspdf.umd.min.js');
+  const { jsPDF } = window.jspdf; const logo = await logoForPdf();
+  const meas = new jsPDF({ unit: 'mm', format: [PDF_W, 300], orientation: 'p' });
+  const heights = list.map((r) => Math.max(PDF_W + 20, Math.ceil(drawReceipt(meas, r, logo, false))));
+  const doc = new jsPDF({ unit: 'mm', format: [PDF_W, heights[0]], orientation: 'p', compress: true });
+  doc.setProperties({ title: list.length === 1 ? `Kvitto ${list[0].nr}` : 'Kvitton', author: pdfText(state.settings.foretag), creator: "lil'bakery Kassa" });
+  list.forEach((r, i) => { if (i) doc.addPage([PDF_W, heights[i]], 'p'); drawReceipt(doc, r, logo, true); });
+  return doc.output('blob');
+}
+const receiptFileName = (r) => `kvitto-${r.nr}-${r.day}.pdf`;
+function receiptPlainText(r) {
+  const s = state.settings; const L = [`Kvitto #${r.nr} från ${s.foretag}`, `${r.day} ${timeOf(r.ts)}`];
+  if (r.preorder) L.push(`Förbeställning F${r.preorder.nr}, ${r.preorder.name}`);
+  L.push('');
+  r.lines.forEach((l) => L.push(`${l.qty} × ${l.name}: ${kr(l.price * l.qty)}`));
+  if (r.discount) L.push(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}: -${kr(r.discount.amount)}`);
+  L.push('', `Att betala: ${kr(r.total)}`);
+  r.vatLines.forEach((v) => L.push(`Varav moms ${v.rate} %: ${kr(v.vat)} (netto ${kr(v.net)})`));
+  L.push(`Betalsätt: ${paymentName(r.payment)}`);
+  if (r.payment === 'kontant') L.push(`Mottaget: ${kr(r.received)}`, `Växel: ${kr(r.change)}`);
+  if (s.kvittoText) L.push('', s.kvittoText);
+  L.push('', [s.foretag, s.orgnr ? `Org.nr ${s.orgnr}` : '', s.adress].filter(Boolean).join(' · '));
+  return L.join('\n');
+}
+function receiptMailHtml(r) {
+  const s = state.settings; const td = 'padding:5px 0;border-bottom:1px solid #d9e9ea;';
+  const row = (a, b, extra = '') => `<tr><td style="${td}${extra}">${a}</td><td style="${td}${extra}text-align:right;white-space:nowrap">${b}</td></tr>`;
+  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#2f4a4d;max-width:420px;margin:0 auto">
+<h2 style="color:#3b7a80;margin:0 0 4px">${esc(s.foretag)}</h2>
+<p style="margin:0 0 12px;color:#6d8688">Kvitto #${r.nr} · ${r.day} ${timeOf(r.ts)}${r.preorder ? `<br>Förbeställning F${r.preorder.nr} · ${esc(r.preorder.name)}` : ''}</p>
+<table style="width:100%;border-collapse:collapse;font-size:14px">
+${r.lines.map((l) => row(`${l.qty} × ${esc(l.name)}`, esc(kr(l.price * l.qty)))).join('')}
+${r.discount ? row(`Rabatt${r.discount.type === 'procent' ? ` ${r.discount.value} %` : ''}`, '-' + esc(kr(r.discount.amount))) : ''}
+${row('<b>Att betala</b>', `<b>${esc(kr(r.total))}</b>`, 'font-size:16px;')}
+${r.vatLines.map((v) => row(`Varav moms ${v.rate} % (netto ${esc(kr(v.net))})`, esc(kr(v.vat)), 'color:#6d8688;font-size:12px;')).join('')}
+${row('Betalsätt', esc(paymentName(r.payment)))}
+${r.payment === 'kontant' ? row('Mottaget', esc(kr(r.received))) + row('Växel', esc(kr(r.change))) : ''}
+</table>
+${s.kvittoText ? `<p style="color:#3b7a80;font-style:italic;text-align:center;margin:16px 0 4px">${esc(s.kvittoText)}</p>` : ''}
+<p style="color:#6d8688;font-size:12px;text-align:center;margin:8px 0 0">${esc([s.foretag, s.orgnr ? `Org.nr ${s.orgnr}` : '', s.adress].filter(Boolean).join(' · '))}</p>
+<p style="color:#6d8688;font-size:12px;text-align:center;margin:4px 0 0">Kvittot finns också som PDF i bilagan.</p>
+</div>`;
+}
+const blobToBase64 = (blob) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
+async function deliverFile(blob, name) {
+  if (IN_PREVIEW) { toast('Nedladdning fungerar i kassan på okiazee.github.io, inte i förhandsvisningen.', 'bad', { duration: 8000 }); return; }
+  const file = new File([blob], name, { type: blob.type || 'application/pdf' });
+  if (isTouch() && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return; }
+    catch (e) {
+      if (e && e.name === 'AbortError') return;
+      const m = openModal({ title: 'Filen är klar', body: `<p class="modal-text">${esc(name)}</p><p class="hint">Tryck Dela eller spara och välj till exempel Spara i Filer, Mail eller Skriv ut.</p>`, footer: '<button class="btn ghost" data-close>Stäng</button><button class="btn primary" data-ok>Dela eller spara</button>' });
+      $('[data-ok]', m.el).addEventListener('click', async () => { m.close(); try { await navigator.share({ files: [file], title: name }); } catch (err) { /* avbrutet */ } });
+      return;
+    }
+  }
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast(`${name} är nedladdad`);
+}
+async function downloadReceipt(r, pdfPromise) {
+  try { deliverFile(await (pdfPromise || receiptsPdfBlob([r])), receiptFileName(r)); }
+  catch (e) { console.error(e); toast('Kunde inte skapa PDF. Kontrollera internet första gången, sedan fungerar det offline.', 'bad', { duration: 9000 }); }
+}
+let driveMailCapable = null;
+async function driveCanMail() {
+  if (driveMailCapable !== null) return driveMailCapable;
+  const json = await driveJson(state.settings.driveUrl.trim() + '?key=' + encodeURIComponent(state.settings.driveKey || '') + '&action=ping&t=' + Date.now());
+  driveMailCapable = !!(json && json.ok && json.mail === true);
+  return driveMailCapable;
+}
+function mailtoUrl(r, to) {
+  const s = state.settings; const addr = String(to || '').replace(/[^\w.@+-]/g, '');
+  return `mailto:${addr}?subject=${encodeURIComponent(`Kvitto #${r.nr} från ${s.foretag}`)}&body=${encodeURIComponent(receiptPlainText(r))}`;
+}
+function mailReceiptDialog(r) {
+  const canSend = driveConfigured() && !IN_PREVIEW;
+  const pdfP = canSend ? receiptsPdfBlob([r]) : null; if (pdfP) pdfP.catch(() => {});
+  const last = r.mailed && r.mailed.length ? r.mailed[r.mailed.length - 1] : null;
+  const m = openModal({ title: `Mejla kvitto #${r.nr}`, body: `
+    <div class="pay-total"><span>${esc(paymentName(r.payment))} · ${r.day} ${timeOf(r.ts)}</span><b>${kr(r.total)}</b></div>
+    <label class="field"><span>Kundens e-postadress</span><input class="input" id="mail-to" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="namn@exempel.se"></label>
+    ${last ? `<p class="hint">Skickat tidigare till ${esc(last.to)}, ${last.at.slice(0, 10)} ${timeOf(last.at)}.</p>` : ''}
+    <p class="hint">${canSend ? 'Skicka går direkt från ditt Google-konto med kvittot som PDF-bilaga. Öppna i Mail skapar i stället ett mejl i enhetens e-postapp.' : 'Öppna i Mail skapar ett mejl med kvittot i enhetens e-postapp. Vill du skicka direkt från kassan med PDF-bilaga: koppla Google Drive under Inställningar.'}</p>`,
+    footer: `<button class="btn ghost" data-close>Avbryt</button><a class="btn" id="mail-app" href="${esc(mailtoUrl(r, ''))}">Öppna i Mail</a>${canSend ? '<button class="btn primary" data-ok>Skicka</button>' : ''}` });
+  const el = m.el; const input = $('#mail-to', el); const link = $('#mail-app', el); const sendBtn = $('[data-ok]', el);
+  input.addEventListener('input', () => { link.href = mailtoUrl(r, input.value.trim()); });
+  link.addEventListener('click', () => setTimeout(() => m.close(), 400));
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); (sendBtn || link).click(); } });
+  if (sendBtn) sendBtn.addEventListener('click', async () => {
+    const to = input.value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { toast('Skriv en giltig e-postadress', 'bad'); input.focus(); return; }
+    if (navigator.onLine === false) { toast('Ingen internetanslutning. Använd Öppna i Mail eller försök igen senare.', 'bad', { duration: 9000 }); return; }
+    sendBtn.disabled = true; sendBtn.textContent = 'Skickar…';
+    const reset = () => { sendBtn.disabled = false; sendBtn.textContent = 'Skicka'; };
+    try {
+      if (!(await driveCanMail())) { reset(); toast('Skriptet i ditt Google-konto behöver uppdateras för att kunna skicka mejl. Se Inställningar, Google Drive.', 'bad', { duration: 15000 }); return; }
+      const s = state.settings; const pdf = await blobToBase64(await pdfP);
+      const json = await driveJson(s.driveUrl.trim(), { method: 'POST', body: JSON.stringify({ key: s.driveKey || '', action: 'mail', to, subject: `Kvitto #${r.nr} från ${s.foretag}`, text: receiptPlainText(r), html: receiptMailHtml(r), pdf, filename: receiptFileName(r), from: s.foretag }) });
+      if (!json || !json.ok) throw new Error((json && json.error) || 'Skriptet svarade med fel');
+      r.mailed = (r.mailed || []).concat({ to, at: new Date().toISOString() }); save(); touchBackup();
+      m.close(); toast(`Kvittot är skickat till ${to}`);
+    } catch (err) { reset(); toast('Kunde inte skicka: ' + friendlyDriveError(err), 'bad', { duration: 12000 }); }
+  });
+  setTimeout(() => input.focus(), 50);
 }
 
 // ---------- Uppdatering ----------
@@ -1726,6 +1901,13 @@ const actions = {
   'po-edit': ({ id }) => { const o = findPo(id); if (o) preorderEditDialog(o); },
   'po-receipt': ({ id }) => { const o = findPo(id); if (o && state.receipts.some((r) => r.id === o.receiptId)) showReceipt(o.receiptId); else toast('Kvittot finns inte längre', 'bad'); },
   'po-show-paid': () => { ui.poShowAllPaid = true; render(); },
+  'receipts-pdf': async ({ el }) => {
+    const list = kvittoList().slice().reverse(); if (!list.length) return;
+    el.disabled = true; el.textContent = 'Skapar PDF…';
+    try { await deliverFile(await receiptsPdfBlob(list), ui.kvittoAll ? `kvitton-alla-${dayKey()}.pdf` : `kvitton-${ui.kvittoDay}.pdf`); }
+    catch (e) { console.error(e); toast('Kunde inte skapa PDF', 'bad'); }
+    finally { if (el.isConnected) { el.disabled = false; el.textContent = 'Ladda ner PDF'; } }
+  },
   'check-update': ({ el }) => checkForUpdate(el),
   install: async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; render(); }
 };

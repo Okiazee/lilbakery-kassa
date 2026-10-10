@@ -100,6 +100,25 @@ Kopiorna hamnar i mappen *lil'bakery Kassa* på Drive: `kassa-backup-senaste.jso
 en fil per dag och dagsavsluten som CSV. *Hämta senaste kopian* läser tillbaka
 kopian till en annan enhet.
 
+## Kvitton som PDF och e-post
+
+Öppna ett kvitto under *Kvitton*, eller tryck *Mejla kvitto* direkt efter köpet.
+
+- **Ladda ner** skapar kvittot som PDF i kvittoformat, 80 mm brett, med logga.
+  På iPad öppnas delningsmenyn med Spara i Filer, Mail, AirDrop och Skriv ut.
+  På datorn laddas filen ner.
+- **Ladda ner PDF** i kvittolistan samlar dagens kvitton, eller alla kvitton,
+  i en PDF med ett kvitto per sida.
+- **Mejla** skickar kvittot till kundens e-postadress. Med Google-skriptet
+  version 2 skickas mejlet direkt från ditt Google-konto med PDF:en som bilaga.
+  Utan det skapar *Öppna i Mail* ett mejl med kvittot i enhetens e-postapp.
+
+För att kunna skicka direkt behöver skriptet i Google uppdateras en gång.
+Kopiera den nya koden under *Inställningar → Google Drive*, ersätt koden i
+script.google.com och spara. Välj sedan Distribuera → Hantera distributioner →
+pennan → Version: Ny version → Distribuera, och godkänn att skriptet får
+skicka e-post. Adressen är densamma som förut.
+
 ## Ny version
 
 När filerna i mappen ändras: ändra `VERSION` i `sw.js` så att installerade
