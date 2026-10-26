@@ -389,8 +389,8 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.7.1';
-const APP_DATE = '2026-10-10';
+const APP_VERSION = '1.7.2';
+const APP_DATE = '2026-10-26';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
 const CAT_COLORS = ['butter', 'pink', 'peach', 'blue', 'mint', 'lavender'];
@@ -1274,7 +1274,7 @@ function renderInstallningar() {
             <li>Ändrar du skriptet senare: Distribuera, <b>Hantera distributioner</b>, pennan, Version: <b>Ny version</b>, Distribuera. Adressen förblir densamma.</li>
             <li><b>Mejla kvitton:</b> har du kopplat Drive före version 1.6, ersätt koden i skriptet med den nya nedan, spara, och gör en ny version enligt punkten ovan. Godkänn att skriptet får skicka e-post. Testa anslutningen visar sedan att kvitton kan mejlas.</li>
           </ol>
-          <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV.</p>
+          <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV. Skriptet är version 3 och används också av fakturaappen, som sparar sina kopior i undermappen <b>Fakturor</b>.</p>
           <div class="btn-row"><button class="btn" data-action="copy-script">Kopiera skriptet</button></div>
           <pre class="code" id="drive-script">${esc(driveScriptText())}</pre>
         </details>
@@ -1518,15 +1518,18 @@ const PREVIEW_MSG = 'Det här är förhandsvisningen på claude.ai, och den får
 function driveConfigured() { return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec\/?$/.test((state.settings.driveUrl || '').trim()); }
 function backupObject() { return { app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }; }
 function driveScriptText() {
-  return `// lil'bakery Kassa, version 2: sparar säkerhetskopior på Google Drive och mejlar kvitton.
-const NYCKEL = '${state.settings.driveKey || ''}';   // samma nyckel som i kassans inställningar
+  return `// lil'bakery Kassa och Faktura, version 3: sparar säkerhetskopior på Google Drive och mejlar kvitton och fakturor.
+const NYCKEL = '${state.settings.driveKey || ''}';   // samma nyckel i kassans och fakturaappens inställningar
 const MAPP = "lil'bakery Kassa";        // mappen skapas i Min enhet på Google Drive
+const FAKTURAMAPP = 'Fakturor';         // undermapp i MAPP för fakturaappens kopior och PDF:er
 
+// Kassan skickar utan app, fakturaappen med app: 'faktura'. Båda mejlar med action: 'mail'.
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     if (data.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
-    if (data.action === 'mail') return skickaKvitto(data);
+    if (data.action === 'mail') return skickaMejl(data);
+    if (data.app === 'faktura') return sparaFaktura(data);
     if (!data.backup || typeof data.backup !== 'object') return svar({ ok: false, error: 'Kopian saknas' });
     const mapp = hamtaMapp();
     const dag = data.day || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -1539,19 +1542,42 @@ function doPost(e) {
 }
 function doGet(e) {
   if (!e.parameter || e.parameter.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
-  if (e.parameter.action === 'ping') return svar({ ok: true, mail: true, version: 2 });
-  const filer = hamtaMapp().getFilesByName('kassa-backup-senaste.json');
+  if (e.parameter.action === 'ping') return svar({ ok: true, mail: true, version: 3, faktura: true });
+  const faktura = e.parameter.app === 'faktura';
+  const mapp = faktura ? hamtaFakturamapp() : hamtaMapp();
+  const filer = mapp.getFilesByName(faktura ? 'faktura-backup-senaste.json' : 'kassa-backup-senaste.json');
   if (!filer.hasNext()) return svar({ ok: false, error: 'Ingen kopia finns' });
   const fil = filer.next();
   return svar({ ok: true, updated: fil.getLastUpdated().toISOString(), backup: JSON.parse(fil.getBlob().getDataAsString()) });
 }
-function skickaKvitto(data) {
+// Fakturaappen: kopian och fakturans PDF hamnar i undermappen Fakturor.
+function sparaFaktura(data) {
+  if (!data.backup || typeof data.backup !== 'object') return svar({ ok: false, error: 'Kopian saknas' });
+  const mapp = hamtaFakturamapp();
+  const dag = /^\\d{4}-\\d{2}-\\d{2}$/.test(data.day || '') ? data.day : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const json = JSON.stringify(data.backup);
+  skriv(mapp, 'faktura-backup-senaste.json', json);
+  skriv(mapp, 'faktura-backup-' + dag + '.json', json);
+  if (data.pdf) sparaPdf(mapp, data.pdfName, data.pdf);
+  return svar({ ok: true, saved: new Date().toISOString() });
+}
+// En faktura som skapas igen med samma nummer ersätter den gamla PDF:en (den gamla läggs i papperskorgen).
+function sparaPdf(mapp, namn, pdf) {
+  let fil = String(namn || '').replace(/[^\\w .,()åäöÅÄÖéÉüÜ-]/g, '').replace(/\\s+/g, ' ').trim().slice(0, 100);
+  if (!fil) fil = 'faktura.pdf';
+  if (!/\\.pdf$/i.test(fil)) fil += '.pdf';
+  const gamla = mapp.getFilesByName(fil);
+  while (gamla.hasNext()) gamla.next().setTrashed(true);
+  mapp.createFile(Utilities.newBlob(Utilities.base64Decode(pdf), 'application/pdf', fil));
+}
+function skickaMejl(data) {
   if (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(data.to || '')) return svar({ ok: false, error: 'Ogiltig e-postadress' });
   const bilagor = data.pdf ? [Utilities.newBlob(Utilities.base64Decode(data.pdf), 'application/pdf', data.filename || 'kvitto.pdf')] : [];
   MailApp.sendEmail({ to: data.to, subject: data.subject || 'Kvitto', body: data.text || '', htmlBody: data.html || undefined, name: data.from || "lil'bakery", attachments: bilagor });
   return svar({ ok: true, sent: new Date().toISOString() });
 }
 function hamtaMapp() { const it = DriveApp.getFoldersByName(MAPP); return it.hasNext() ? it.next() : DriveApp.createFolder(MAPP); }
+function hamtaFakturamapp() { const mapp = hamtaMapp(); const it = mapp.getFoldersByName(FAKTURAMAPP); return it.hasNext() ? it.next() : mapp.createFolder(FAKTURAMAPP); }
 function skriv(mapp, namn, innehall) { const it = mapp.getFilesByName(namn); if (it.hasNext()) it.next().setContent(innehall); else mapp.createFile(namn, innehall, MimeType.PLAIN_TEXT); }
 function svar(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }`;
 }

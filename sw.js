@@ -1,5 +1,5 @@
 /* Service worker för lil'bakery Kassa: appen fungerar offline när den väl laddats en gång. */
-const VERSION = '2026-10-15.1';
+const VERSION = '2026-10-26.1';
 const SHELL = 'kassa-shell-' + VERSION;
 const FONTS = 'kassa-fonts';
 const ASSETS = [
@@ -18,7 +18,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== SHELL && k !== FONTS).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('kassa-') && k !== SHELL && k !== FONTS).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

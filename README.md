@@ -110,7 +110,7 @@ kopian till en annan enhet.
 - **Ladda ner PDF** i kvittolistan samlar dagens kvitton, eller alla kvitton,
   i en PDF med ett kvitto per sida.
 - **Mejla** skickar kvittot till kundens e-postadress. Med Google-skriptet
-  version 2 skickas mejlet direkt från ditt Google-konto med PDF:en som bilaga.
+  version 2 eller senare skickas mejlet direkt från ditt Google-konto med PDF:en som bilaga.
   Utan det skapar *Öppna i Mail* ett mejl med kvittot i enhetens e-postapp.
 
 För att kunna skicka direkt behöver skriptet i Google uppdateras en gång.
