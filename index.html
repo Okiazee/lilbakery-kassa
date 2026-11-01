@@ -474,7 +474,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.10.2';
+const APP_VERSION = '1.10.3';
 const APP_DATE = '2026-11-01';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -1123,7 +1123,9 @@ function orderMessage(o, kind) {
 }
 function messageMailHtml(text) {
   const s = state.settings; const c = receiptContact();
-  const paras = esc(text).split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.55">${p.replace(/\n/g, '<br>')}</p>`).join('');
+  // Swish-numret blir fett och understruket.
+  const sw = s.swish ? esc(formatSwish(s.swish)) : ''; const em = (p) => (sw ? p.split(sw).join(`<b style="text-decoration:underline">${sw}</b>`) : p);
+  const paras = esc(text).split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.55">${em(p).replace(/\n/g, '<br>')}</p>`).join('');
   return `<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head><body style="margin:0;padding:0;background:#f3f8f8"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f8f8"><tr><td align="center" style="padding:28px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #d9e9ea;border-radius:18px;font-family:Arial,Helvetica,sans-serif;color:#2f4a4d"><tr><td style="padding:28px 32px 4px;text-align:center"><img src="${PUBLIC_URL}img/logo.png" width="120" alt="${esc(s.foretag)}" style="display:inline-block;width:120px;height:auto;border:0"></td></tr><tr><td style="padding:16px 32px 12px">${paras}</td></tr><tr><td style="padding:16px 32px 20px;border-top:1px solid #d9e9ea;background:#f3f8f8;border-radius:0 0 18px 18px;text-align:center;font-size:12px;color:#6d8688;line-height:1.7">${esc(c.line1)}${c.line2 ? `<br>${esc(c.line2)}` : ''}</td></tr></table></td></tr></table></body></html>`;
 }
 function markSent(o, kind, channel) {
@@ -2443,7 +2445,8 @@ function drawConfirmation(doc, o, kind, logo, F, D, pageH) {
   const wrap = (t, w) => doc.splitTextToSize(T(t), w);
   const hr = (y, c, lw) => { if (!D) return; const k = c || COL.line; doc.setDrawColor(k[0], k[1], k[2]); doc.setLineWidth(lw || 0.25); doc.line(M, y, R, y); };
   const caps = (t, x, y, opts) => { doc.setCharSpace(0.5); text(t.toUpperCase(), x, y, opts); doc.setCharSpace(0); };
-  const t = orderTotals(o); const v = KO.templateVars(o, { foretag: s.foretag, swish: s.swish ? formatSwish(s.swish) : '', formatKr: kr, total: t.total, discountAmount: t.discountAmount });
+  const sw = s.swish ? formatSwish(s.swish) : '';
+  const t = orderTotals(o); const v = KO.templateVars(o, { foretag: s.foretag, swish: sw, formatKr: kr, total: t.total, discountAmount: t.discountAmount });
   let y = M;
   // Sidhuvud som på kvittot
   const logoW = 32; const logoH = logo ? logoW * logo.ratio : 0;
@@ -2501,15 +2504,32 @@ function drawConfirmation(doc, o, kind, logo, F, D, pageH) {
     if (fitsRow(lab, big, sz, true)) { font(true, sz, COL.brand); text(lab, tx, y); text(big, cSum, y, { align: 'right' }); y += 7; }
     else { font(true, 11, COL.brand); text(lab, tx, y); y += 7; font(true, 16, COL.brand); text(big, cSum, y, { align: 'right' }); y += 7.5; } }
   if (!t.missing) t.vatLines.forEach((x) => { row(`Varav moms ${x.rate} %`, kr2(x.vat), 8.6); y += 4.6; });
+  // Bryter texten ord för ord, så att em (Swish-numret) blir ett fetstilt stycke som inte delas.
+  const emWrap = (body, at, em, max) => {
+    const toks = []; let gap = false;
+    const words = (str) => str.split(/(\s+)/).forEach((p) => { if (!p) return; if (/^\s+$/.test(p)) gap = true; else { toks.push({ t: p, b: false, gap }); gap = false; } });
+    words(body.slice(0, at)); toks.push({ t: em, b: true, gap }); gap = false; words(body.slice(at + em.length));
+    const lines = [[]]; let x = 0;
+    toks.forEach((k) => {
+      font(false, 9.4); const sp = k.gap ? doc.getTextWidth(' ') : 0; font(k.b, 9.4); const w = doc.getTextWidth(T(k.t)); const line = lines[lines.length - 1];
+      if (line.length && k.gap && x + sp + w > max) { lines.push([{ t: k.t, b: k.b, x: 0 }]); x = w; }
+      else { const px = line.length ? x + sp : 0; line.push({ t: k.t, b: k.b, x: px }); x = px + w; }
+    });
+    return lines;
+  };
   // Rutor med betalning och önskemål
-  const box = (title, body, color) => {
-    y += 4; font(false, 9.4, COL.ink); const parts = wrap(body, CW - 12); const h = 11 + parts.length * 4.6;
+  const box = (title, body, color, em) => {
+    y += 4; font(false, 9.4, COL.ink); const at = em ? body.indexOf(em) : -1;
+    const lines = at < 0 ? wrap(body, CW - 12).map((part) => [{ t: part, b: false, x: 0 }]) : emWrap(body, at, em, CW - 12); const h = 11 + lines.length * 4.6;
     if (D) { doc.setFillColor(color[0], color[1], color[2]); doc.roundedRect(M, y, CW, h, 3, 3, 'F'); }
     font(true, 7, COL.muted); caps(title, M + 6, y + 6.5);
-    font(false, 9.4, COL.ink); parts.forEach((part, i) => text(part, M + 6, y + 12 + i * 4.6));
+    lines.forEach((parts, i) => { const ly = y + 12 + i * 4.6; parts.forEach((p) => {
+      const px = M + 6 + p.x; font(p.b, 9.4, COL.ink); text(p.t, px, ly);
+      if (p.b && D) { doc.setDrawColor(COL.ink[0], COL.ink[1], COL.ink[2]); doc.setLineWidth(0.3); doc.line(px, ly + 1, px + doc.getTextWidth(T(p.t)), ly + 1); }
+    }); });
     y += h;
   };
-  if (o.payment !== 'betald') box('Betalning', v.betalning, COL.mist);
+  if (o.payment !== 'betald') box('Betalning', v.betalning, COL.mist, sw);
   if (o.note) box('Önskemål', o.note, [253, 243, 214]);
   // Hälsning och sidfot
   y += 12; doc.setFont(F.script, F.scriptStyle); doc.setFontSize(F.unicode ? 24 : 14); doc.setTextColor(COL.brand[0], COL.brand[1], COL.brand[2]);
