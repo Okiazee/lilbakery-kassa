@@ -9,6 +9,9 @@ Swish och kontanter. All data sparas lokalt på enheten.
 ```
 kassa/
   index.html              Hela appen (gränssnitt och logik)
+  rabatt.js               Rabattkoder: skapa, kontrollera och räkna användning
+  bestallning.js          Beställningar: status, agenda, månadskalender, kalenderfil och meddelanden
+  tests/                  Tester för rabatt.js och bestallning.js (node --test tests/*.test.mjs)
   manifest.webmanifest    Gör att appen kan installeras på hemskärmen
   sw.js                   Service worker: appen fungerar utan internet
   icons/                  Appikoner
@@ -118,6 +121,42 @@ Kopiera den nya koden under *Inställningar → Google Drive*, ersätt koden i
 script.google.com och spara. Välj sedan Distribuera → Hantera distributioner →
 pennan → Version: Ny version → Distribuera, och godkänn att skriptet får
 skicka e-post. Adressen är densamma som förut.
+
+## Rabattkoder
+
+Under *Produkter → Rabattkoder* skapar du koder: egen text som FIKA25 eller en
+slumpad kod, procent eller kronor, valfria datum och max antal gånger. I kassan
+finns aktiva koder som knappar i rabattdialogen, och koden kan också skrivas in.
+En kod ersätter en egen rabatt och tvärtom, de läggs inte ihop.
+
+Hur ofta en kod använts, hur mycket rabatt den gett och när räknas fram ur
+kvittona. Därför räknas makulerade köp inte, och en återställd kopia blir rätt.
+Öppna beställningar med koden visas som reserverade och räknas mot max antal.
+Dagsavslutet visar rabatt per kod.
+
+## Beställningar
+
+Fliken *Beställningar* ersätter Förbeställningar. Gamla förbeställningar finns
+kvar med samma nummer, som B1, B2 och så vidare.
+
+- **Ny beställning** skapas direkt i fliken, med produkter från listan och egna
+  rader med pris, till exempel en tårta. Från kassan sparas ett pågående köp med
+  *Spara som beställning*.
+- Status: Ny, Bekräftad, Utlämnad och Avbokad. Betalning: i kassan eller
+  faktureras. En ny beställning får sakna pris, men inte en bekräftad.
+- **Bekräfta** öppnar bekräftelsetexten. Den kan kopieras, delas eller mejlas, och
+  beställningen blir då bekräftad. Under *Meddelande* finns också en påminnelse.
+  Texterna ändras under Inställningar.
+- **Kalender** visar månaden med antal beställningar per dag. Tryck på en dag för
+  att se dess beställningar. Varje beställning kan läggas i Google Kalender eller
+  sparas som kalenderfil (.ics).
+- **Swish** och **Kontant** på kortet lägger beställningen i kassan och tar betalt.
+  Kvittot märks med beställningen. Makuleras kvittot blir beställningen obetald
+  igen.
+
+Beställningarna sparas på enheten, liksom kvittona. Hantera dem på den enhet där
+du har kassan. *Hämta senaste kopian* ersätter allt på enheten och varnar om
+enheten har nyare ändringar.
 
 ## Ny version
 
