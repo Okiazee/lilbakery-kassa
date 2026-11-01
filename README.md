@@ -11,7 +11,7 @@ kassa/
   index.html              Hela appen (gränssnitt och logik)
   rabatt.js               Rabattkoder: skapa, kontrollera och räkna användning
   bestallning.js          Beställningar: status, agenda, månadskalender, kalenderfil och meddelanden
-  tests/                  Tester för rabatt.js och bestallning.js (node --test tests/*.test.mjs)
+  tests/                  Tester för rabatt.js, bestallning.js och Google-skriptet (node --test tests/*.test.mjs)
   manifest.webmanifest    Gör att appen kan installeras på hemskärmen
   sw.js                   Service worker: appen fungerar utan internet
   icons/                  Appikoner
@@ -132,7 +132,7 @@ En kod ersätter en egen rabatt och tvärtom, de läggs inte ihop.
 Hur ofta en kod använts, hur mycket rabatt den gett och när räknas fram ur
 kvittona. Därför räknas makulerade köp inte, och en återställd kopia blir rätt.
 Öppna beställningar med koden visas som reserverade och räknas mot max antal.
-Dagsavslutet visar rabatt per kod.
+Dagsavslutet visar rabatt per kod. En kod som nått sitt max visas som *Förbrukad*.
 
 ## Beställningar
 
@@ -149,7 +149,12 @@ kvar med samma nummer, som B1, B2 och så vidare.
   Texterna ändras under Inställningar.
 - **Kalender** visar månaden med antal beställningar per dag. Tryck på en dag för
   att se dess beställningar. Varje beställning kan läggas i Google Kalender eller
-  sparas som kalenderfil (.ics).
+  sparas som kalenderfil (.ics), men enklast är den automatiska synken nedan.
+- **Spara som bild** i meddelandet skapar bekräftelsen eller påminnelsen som en
+  PNG i samma utformning som kvittot, att skicka i sms, Messenger eller Instagram.
+- **Intern anteckning** syns bara för dig. Adresser som `https://…` och `www.…`
+  blir klickbara, och *+ Länk* lägger in en länk med egen text, till exempel
+  en bild på tårtan.
 - **Swish** och **Kontant** på kortet lägger beställningen i kassan och tar betalt.
   Kvittot märks med beställningen. Makuleras kvittot blir beställningen obetald
   igen.
@@ -157,6 +162,28 @@ kvar med samma nummer, som B1, B2 och så vidare.
 Beställningarna sparas på enheten, liksom kvittona. Hantera dem på den enhet där
 du har kassan. *Hämta senaste kopian* ersätter allt på enheten och varnar om
 enheten har nyare ändringar.
+
+## Beställningar i Google Kalender
+
+Under *Inställningar → Google Kalender* kan kassan lägga alla beställningar med
+datum i en egen kalender, som standard *lil'bakery beställningar*. Din vanliga
+kalender rörs inte. Händelsen visar varor, belopp, telefon, önskemål och den
+interna anteckningen, och flyttas eller tas bort när beställningen ändras.
+Utlämnade beställningar får en bock i titeln och nya en markering
+*(ej bekräftad)*. Beställningar äldre än 60 dagar skickas inte.
+
+Synken går genom samma skript som Google Drive, version 4:
+
+1. Kopiera skriptet under *Inställningar → Google Drive* och ersätt koden i
+   script.google.com. Spara.
+2. Välj funktionen `godkann` i verktygsraden och tryck *Kör*. Godkänn att
+   skriptet får hantera kalendrar.
+3. Distribuera → Hantera distributioner → pennan → Version: Ny version →
+   Distribuera.
+4. Bocka i *Synka beställningar till Google Kalender*.
+
+Frågar Google inte om lov i steg 2: ta bort skriptets åtkomst på
+<https://myaccount.google.com/connections> och kör `godkann` igen.
 
 ## Ny version
 

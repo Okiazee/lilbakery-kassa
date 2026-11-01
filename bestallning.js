@@ -181,11 +181,70 @@
     return text.split('\n').map((l) => l.replace(/[ \t]+$/g, '')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
+  // ---------- Länkar i anteckningar ----------
+  // [text](https://…) och bara adresser (https://…, www.…) blir länkar. Allt annat är text.
+  const LINK_RE = /\[([^\]\n]{1,200})\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi;
+  function trimUrl(u) { const m = /[.,;:!?)\]]+$/.exec(u); return m ? [u.slice(0, -m[0].length), m[0]] : [u, '']; }
+  function linkParts(text) {
+    const src = String(text || ''); const out = []; let last = 0; let m;
+    LINK_RE.lastIndex = 0;
+    while ((m = LINK_RE.exec(src))) {
+      if (m.index > last) out.push({ type: 'text', text: src.slice(last, m.index) });
+      if (m[1]) out.push({ type: 'link', label: m[1], url: m[2] });
+      else {
+        const [raw, tail] = trimUrl(m[3]);
+        out.push({ type: 'link', label: raw, url: /^www\./i.test(raw) ? 'https://' + raw : raw });
+        if (tail) out.push({ type: 'text', text: tail });
+      }
+      last = m.index + m[0].length;
+    }
+    if (last < src.length) out.push({ type: 'text', text: src.slice(last) });
+    return out;
+  }
+  const links = (text) => linkParts(text).filter((p) => p.type === 'link');
+  // För kalendern och vanlig text: [text](adress) blir "text: adress".
+  const plainLinks = (text) => linkParts(text).map((p) => (p.type === 'link' ? (p.label === p.url || p.label === p.url.replace(/^https:\/\//, '') ? p.url : `${p.label}: ${p.url}`) : p.text)).join('');
+
+  // ---------- Google Kalender ----------
+  // Händelsen som skickas till skriptet, eller null när beställningen inte ska finnas i kalendern.
+  function calendarEvent(o, { total, missing = 0, formatKr = (n) => `${n} kr` } = {}) {
+    if (!isYmd(o.pickupDate) || o.status === 'avbokad') return null;
+    const pre = o.status === 'utlamnad' ? '✓ ' : '';
+    const post = o.status === 'ny' ? ' (ej bekräftad)' : '';
+    const desc = [
+      o.lines.map((l) => `${l.qty} × ${l.name}`).join('\n'),
+      `Att betala: ${missing ? 'pris saknas' : formatKr(total)} (${PAYMENT_LABELS[o.payment].toLowerCase()})`,
+      `Status: ${STATUS_LABELS[o.status]}`,
+      o.phone ? `Telefon: ${o.phone}` : '', o.email ? `E-post: ${o.email}` : '',
+      o.kind === 'leverans' && o.address ? `Leverans till: ${o.address}` : '',
+      o.note ? `Önskemål: ${o.note}` : '', o.internalNote ? `Intern anteckning:\n${plainLinks(o.internalNote)}` : ''
+    ].filter(Boolean).join('\n');
+    return {
+      id: o.id, titel: `${pre}B${o.nr} ${o.name}, ${o.kind === 'leverans' ? 'leverans' : 'hämtning'}${post}`,
+      datum: o.pickupDate, tid: isHm(o.pickupTime) ? o.pickupTime : '', minuter: 30,
+      beskrivning: desc, plats: o.kind === 'leverans' ? (o.address || '') : ''
+    };
+  }
+  // Kort kontrollsumma (djb2) för att se om en händelse ändrats sedan den skickades.
+  function hash(value) { const s = JSON.stringify(value); let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36); }
+  // Vad som behöver skickas: ändrade och nya händelser, och borttagningar av sådant som skickats förut.
+  // sent = { orderId: hash } från förra lyckade synken. events = { orderId: händelse eller null }.
+  function calendarChanges(events, sent) {
+    const upserts = []; const deletes = [];
+    for (const [id, ev] of Object.entries(events)) {
+      if (ev) { if (sent[id] !== hash(ev)) upserts.push(ev); }
+      else if (sent[id]) deletes.push(id);
+    }
+    for (const id of Object.keys(sent)) if (!(id in events)) deletes.push(id);
+    return { upserts, deletes };
+  }
+
   const api = {
     STATUS_LABELS, PAYMENT_LABELS, KIND_LABELS, TEMPLATE_LABELS, DEFAULT_TEMPLATES, PLACEHOLDERS,
     migrate, isOpen, missingPrices, canPay, canConfirm, canDeliverInvoiced, log,
     longDay, shortDay, svTime, dayLabel, sortKey, agenda, monthGrid, addMonth, shift,
-    icsEscape, icsFold, eventTimes, ics, googleCalendarUrl, templateVars, render
+    icsEscape, icsFold, eventTimes, ics, googleCalendarUrl, templateVars, render,
+    linkParts, links, plainLinks, calendarEvent, hash, calendarChanges
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.KassaOrder = api;

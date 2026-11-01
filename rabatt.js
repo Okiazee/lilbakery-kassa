@@ -65,14 +65,16 @@
     return { count: uses.length, amount: r2(uses.reduce((s, u) => s + u.amount, 0)), last: uses.length ? uses[uses.length - 1].at : null, uses, reserved };
   }
 
-  // 'aktiv' | 'inaktiv' | 'kommande' | 'utgangen'. today = 'YYYY-MM-DD'; datum jämförs som text, slutdatum ingår.
-  function status(code, today) {
+  // 'aktiv' | 'inaktiv' | 'forbrukad' | 'kommande' | 'utgangen'. today = 'YYYY-MM-DD'; datum jämförs som text, slutdatum ingår.
+  // used = gånger koden använts eller reserverats; når den maxUses är koden förbrukad.
+  function status(code, today, used = 0) {
     if (!code.active) return 'inaktiv';
+    if (code.maxUses && used >= code.maxUses) return 'forbrukad';
     if (isYmd(code.validFrom) && today < code.validFrom) return 'kommande';
     if (isYmd(code.validTo) && today > code.validTo) return 'utgangen';
     return 'aktiv';
   }
-  const STATUS_LABELS = { aktiv: 'Aktiv', inaktiv: 'Inaktiv', kommande: 'Kommande', utgangen: 'Utgången' };
+  const STATUS_LABELS = { aktiv: 'Aktiv', inaktiv: 'Inaktiv', forbrukad: 'Förbrukad', kommande: 'Kommande', utgangen: 'Utgången' };
 
   // Kontroll när koden läggs på ett köp eller en beställning. excludeOrderId = beställningen som koden
   // läggs på (den ska inte räknas som en reservation mot sig själv).

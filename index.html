@@ -320,6 +320,11 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .po-items li { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
 .po-items li span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
 .po-note { padding: 8px 10px; border-radius: 10px; background: var(--cat-butter); color: #6b5410; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.po-note.po-internal { background: var(--mist); color: var(--ink); font-weight: 500; }
+.po-note.po-internal > b { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
+.po-note a, .note-links a { color: var(--blue-ink); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.note-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 12px; }
+.note-links { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 14px; }
 .po-actions { display: flex; gap: 8px; margin-top: 4px; }
 .po-actions .btn { flex: 1; min-height: 48px; font-size: 16px; }
 .badge.po { background: var(--cat-pink); color: var(--pink-ink); }
@@ -350,6 +355,8 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .code-actions .btn { flex: 1; }
 .badge.cs-aktiv { background: var(--good-bg); color: var(--good); }
 .badge.cs-inaktiv, .badge.cs-utgangen { background: var(--bad-bg); color: var(--bad); }
+.badge.cs-forbrukad { background: var(--line); color: var(--ink); }
+.code-stats b { color: var(--ink); }
 .badge.cs-kommande { background: var(--warn-bg); color: var(--warn); }
 .code-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .code-chip { font-family: ui-monospace, 'SF Mono', Consolas, monospace; letter-spacing: .04em; }
@@ -467,7 +474,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 const APP_DATE = '2026-11-01';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -568,7 +575,7 @@ const isTouch = () => navigator.maxTouchPoints > 1;
 
 // ---------- State ----------
 function defaultSettings() {
-  return { foretag: "lil'bakery", orgnr: '', adress: '', swish: '', kvittoText: 'Tack för ditt köp!', epost: '', webb: '', mallBekraftelse: '', mallPaminnelse: '', momsStandard: 6, pin: '', vaxelkassa: 500, driveUrl: '', driveKey: '', driveAuto: true };
+  return { foretag: "lil'bakery", orgnr: '', adress: '', swish: '', kvittoText: 'Tack för ditt köp!', epost: '', webb: '', mallBekraftelse: '', mallPaminnelse: '', momsStandard: 6, pin: '', vaxelkassa: 500, driveUrl: '', driveKey: '', driveAuto: true, calSync: false, calName: '' };
 }
 // Sortimentet från pop-up-menyn. Priser i hela kronor inklusive moms.
 const MENU_ID = 'popup-2026-10';
@@ -786,6 +793,10 @@ function poWhen(o) {
   const t = KO.svTime(o.pickupTime);
   return d || t ? [o.kind === 'leverans' ? 'Leverans' : 'Hämtas', d, t].filter(Boolean).join(' ') : '';
 }
+// Text med klickbara länkar: [text](https://…), https://… och www.…
+function linkHtml(text) {
+  return KO.linkParts(text).map((p) => (p.type === 'link' ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.label)}</a>` : esc(p.text))).join('').replace(/\n/g, '<br>');
+}
 const discountLabel = (d) => `${d.reason || 'Rabatt'}${d.type === 'procent' ? ` ${d.value} %` : ''}`;
 function poCard(o) {
   const t = orderTotals(o); const today = dayKey(); const when = poWhen(o);
@@ -802,6 +813,7 @@ function poCard(o) {
     ${o.kind === 'leverans' && o.address ? `<div class="po-meta"><span>Till ${esc(o.address)}</span></div>` : ''}
     <ul class="po-items">${o.lines.map((l) => `<li><span>${l.qty} × ${esc(l.name || 'Namnlös rad')}</span><span>${l.price === null || l.price === undefined || l.price === '' ? 'pris saknas' : nf.format(r2(l.price * l.qty))}</span></li>`).join('') || '<li><span class="muted">Inga varor ännu</span><span></span></li>'}${t.discount ? `<li><span>${esc(discountLabel(t.discount))}</span><span>−${nf.format(t.discount.amount)}</span></li>` : ''}</ul>
     ${o.note ? `<div class="po-note">${esc(o.note)}</div>` : ''}
+    ${o.internalNote ? `<div class="po-note po-internal"><b>Intern</b>${linkHtml(o.internalNote)}</div>` : ''}
     ${lastSent ? `<div class="po-sent">${KO.TEMPLATE_LABELS[lastSent.kind] || 'Meddelande'} skickad ${shortDate(lastSent.at)}</div>` : ''}
     ${main ? `<div class="po-actions">${main}</div>` : ''}
     <div class="po-more"><button class="btn small ghost" data-action="po-msg" data-id="${o.id}">Meddelande</button><button class="btn small ghost" data-action="po-cal" data-id="${o.id}">Kalender</button><button class="btn small ghost" data-action="po-edit" data-id="${o.id}">Öppna</button></div>
@@ -923,7 +935,8 @@ function orderDialog(id) {
     <div class="ord-total" id="od-total"></div>
     <div class="ord-section"><h3>Betalning</h3>${d.payment === 'betald' ? `<p>Betald${existing && existing.receiptNr ? ` med kvitto #${existing.receiptNr}` : ''}.</p>` : `<div class="seg" id="od-pay"><button class="seg-btn ${d.payment === 'obetald' ? 'is-active' : ''}" data-pay="obetald" ${closed ? 'disabled' : ''}>Betalas i kassan</button><button class="seg-btn ${d.payment === 'faktura' ? 'is-active' : ''}" data-pay="faktura" ${closed ? 'disabled' : ''}>Faktureras</button></div>`}</div>
     <label class="field"><span>Kundens önskemål och allergier</span><textarea class="input" id="od-note" placeholder="Syns i bekräftelsen till kunden">${esc(d.note)}</textarea></label>
-    <label class="field"><span>Intern anteckning</span><textarea class="input" id="od-internal" placeholder="Syns bara för dig">${esc(d.internalNote)}</textarea></label>
+    <label class="field"><span>Intern anteckning</span><textarea class="input" id="od-internal" placeholder="Syns bara för dig. Länkar blir klickbara.">${esc(d.internalNote)}</textarea></label>
+    <div class="note-tools"><button class="btn small" data-add-link>+ Länk</button><div class="note-links" id="od-links"></div></div>
     ${existing && existing.history.length ? `<details class="howto"><summary>Historik</summary><div class="history-list">${existing.history.slice().reverse().map((h) => `<div>${h.ts.slice(0, 10)} ${timeOf(h.ts)} · ${esc(h.text)}</div>`).join('')}</div></details>` : ''}`,
     footer: `${existing && KO.isOpen(existing) ? '<button class="btn danger-ghost" data-cancel>Avboka</button>' : ''}${existing && existing.status === 'avbokad' ? '<button class="btn" data-reopen>Återöppna</button>' : ''}${existing && !existing.receiptId && (existing.status === 'ny' || existing.status === 'avbokad') ? '<button class="btn danger-ghost" data-del>Ta bort</button>' : ''}<button class="btn ghost" data-close>Avbryt</button>${closed ? '' : `<button class="btn primary" data-ok>${existing ? 'Spara' : 'Spara beställning'}</button>`}` });
   const el = m.el; const linesEl = $('#od-lines', el); const totalEl = $('#od-total', el); const discEl = $('#od-discount', el);
@@ -956,6 +969,16 @@ function orderDialog(id) {
     if (!d.discount) discEl.value = '';
   };
   drawLines(); drawDiscount();
+  const internalEl = $('#od-internal', el); const linksEl = $('#od-links', el);
+  const drawLinks = () => { linksEl.innerHTML = KO.links(internalEl.value).map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join(''); };
+  drawLinks(); internalEl.addEventListener('input', drawLinks);
+  $('[data-add-link]', el).addEventListener('click', async () => {
+    const at = internalEl.selectionStart ?? internalEl.value.length;
+    const link = await linkDialog(); if (!link) return;
+    const v = internalEl.value; const before = v.slice(0, at); const after = v.slice(at);
+    const pre = before && !/\s$/.test(before) ? ' ' : ''; const post = after && !/^\s/.test(after) ? ' ' : '';
+    internalEl.value = before + pre + link + post + after; drawLinks(); internalEl.focus();
+  });
   linesEl.addEventListener('input', (e) => {
     const t = e.target; const i = Number(t.dataset.i); if (!d.lines[i]) return;
     if (t.dataset.f === 'name') d.lines[i].name = t.value;
@@ -1030,6 +1053,27 @@ function orderDialog(id) {
   });
   if (!existing) setTimeout(() => $('#od-name', el).focus(), 50);
 }
+// Frågar efter adress och valfri text. Ger "[text](adress)", bara adressen, eller null.
+function linkDialog() {
+  return new Promise((resolve) => {
+    let result = null;
+    const m = openModal({ title: 'Lägg till länk', body: `
+      <label class="field"><span>Adress</span><input class="input" id="ln-url" type="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…" autocomplete="off"></label>
+      <label class="field"><span>Text som visas (valfritt)</span><input class="input" id="ln-text" placeholder="t.ex. Tårtbild, Instagram-meddelande" autocomplete="off"></label>
+      <p class="hint">Du kan också skriva eller klistra in en adress direkt i anteckningen. Den blir klickbar ändå.</p>`,
+      footer: '<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Lägg till</button>', onClose: () => resolve(result) });
+    const urlEl = $('#ln-url', m.el); const textEl = $('#ln-text', m.el);
+    const ok = () => {
+      let url = urlEl.value.trim(); if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+      if (!/^https?:\/\/[^\s/$.?#][^\s]*$/i.test(url)) { toast('Skriv en webbadress, till exempel https://instagram.com/…', 'bad'); urlEl.focus(); return; }
+      const text = textEl.value.replace(/[[\]\n]/g, ' ').trim();
+      result = text ? `[${text}](${url.replace(/\)/g, '%29')})` : url; m.close();
+    };
+    $('[data-ok]', m.el).addEventListener('click', ok);
+    [urlEl, textEl].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ok(); } }));
+    setTimeout(() => urlEl.focus(), 50);
+  });
+}
 async function deliverInvoiced(o) {
   if (!(await confirmDialog({ title: `Lämna ut B${o.nr}`, text: `Beställningen för <b>${esc(o.name)}</b> markeras som utlämnad. Den faktureras, så inget kvitto skapas i kassan. Skapa fakturan i fakturaappen.`, ok: 'Markera utlämnad' }))) return;
   o.status = 'utlamnad'; o.deliveredAt = new Date().toISOString(); o.updatedAt = o.deliveredAt; KO.log(o, 'Utlämnad, faktureras');
@@ -1049,7 +1093,7 @@ function messageMailHtml(text) {
 function markSent(o, kind, channel) {
   const now = new Date();
   o.sent.push({ kind, at: now.toISOString(), channel });
-  const how = { kopierad: 'kopierad', delad: 'delad', mejl: `mejlad till ${o.email}`, mejlapp: 'öppnad i e-postappen' }[channel] || channel;
+  const how = { kopierad: 'kopierad', delad: 'delad', mejl: `mejlad till ${o.email}`, mejlapp: 'öppnad i e-postappen', bild: 'sparad som bild' }[channel] || channel;
   KO.log(o, `${KO.TEMPLATE_LABELS[kind] || 'Meddelande'} ${how}`, now);
   if (kind === 'bekraftelse' && o.status === 'ny') { o.status = 'bekraftad'; KO.log(o, 'Bekräftad', now); }
   o.updatedAt = now.toISOString(); save(); touchBackup();
@@ -1065,11 +1109,17 @@ function messageDialog(o, kind = 'bekraftelse') {
     <div class="seg" id="msg-kind">${Object.keys(KO.TEMPLATE_LABELS).map((k) => `<button class="seg-btn ${k === cur ? 'is-active' : ''}" data-kind="${k}">${KO.TEMPLATE_LABELS[k]}</button>`).join('')}</div>
     <textarea class="input msg-text" id="msg-text" aria-label="Meddelandet"></textarea>
     <p class="hint">${[o.phone ? `Telefon ${esc(o.phone)}` : '', o.email ? `E-post ${esc(o.email)}` : ''].filter(Boolean).join(' · ') || 'Ingen telefon eller e-post sparad.'} Ändra gärna texten innan du skickar. Mallarna ändrar du under Inställningar.</p>`,
-    footer: `<button class="btn ghost" data-close>Stäng</button><button class="btn ${o.email || canShare ? '' : 'primary'}" data-copy>Kopiera</button>${canShare ? `<button class="btn ${o.email ? '' : 'primary'}" data-share>Dela</button>` : ''}${o.email ? '<button class="btn primary" data-mail>Mejla</button>' : ''}` });
+    footer: `<button class="btn ghost" data-close>Stäng</button><button class="btn" data-img>Spara som bild</button><button class="btn ${o.email || canShare ? '' : 'primary'}" data-copy>Kopiera</button>${canShare ? `<button class="btn ${o.email ? '' : 'primary'}" data-share>Dela</button>` : ''}${o.email ? '<button class="btn primary" data-mail>Mejla</button>' : ''}` });
   const el = m.el; const ta = $('#msg-text', el);
+  // Bilden skapas i förväg, så att delningsmenyn på iPad öppnas direkt vid tryck.
+  let imgP = null; const makeImg = () => { imgP = IN_PREVIEW ? null : confirmationPngBlob(o, cur); if (imgP) imgP.catch(() => {}); };
   const fill = () => { ta.value = orderMessage(o, cur); };
-  fill();
-  $$('#msg-kind .seg-btn', el).forEach((b) => b.addEventListener('click', () => { cur = b.dataset.kind; $$('#msg-kind .seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); fill(); }));
+  fill(); makeImg();
+  $$('#msg-kind .seg-btn', el).forEach((b) => b.addEventListener('click', () => { cur = b.dataset.kind; $$('#msg-kind .seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); fill(); makeImg(); }));
+  $('[data-img]', el).addEventListener('click', async () => {
+    try { if (await deliverFile(await (imgP || confirmationPngBlob(o, cur)), `${cur === 'paminnelse' ? 'paminnelse' : 'bekraftelse'}-B${o.nr}.png`)) markSent(o, cur, 'bild'); }
+    catch (e) { console.error(e); toast('Kunde inte skapa bilden', 'bad'); }
+  });
   $('[data-copy]', el).addEventListener('click', async () => { if (await copyText(ta.value, 'Texten är kopierad')) markSent(o, cur, 'kopierad'); });
   $('[data-share]', el)?.addEventListener('click', () => { navigator.share({ text: ta.value }).then(() => markSent(o, cur, 'delad')).catch(() => {}); });
   $('[data-mail]', el)?.addEventListener('click', async (e) => {
@@ -1088,7 +1138,7 @@ function messageDialog(o, kind = 'bekraftelse') {
 }
 function orderEventInfo(o) {
   const t = orderTotals(o);
-  const description = [o.lines.map((l) => `${l.qty} × ${l.name}`).join('\n'), `Att betala: ${t.missing ? 'pris saknas' : kr(t.total)} (${KO.PAYMENT_LABELS[o.payment].toLowerCase()})`, o.phone ? `Telefon: ${o.phone}` : '', o.email ? `E-post: ${o.email}` : '', o.note ? `Önskemål: ${o.note}` : '', o.internalNote ? `Intern anteckning: ${o.internalNote}` : ''].filter(Boolean).join('\n');
+  const description = [o.lines.map((l) => `${l.qty} × ${l.name}`).join('\n'), `Att betala: ${t.missing ? 'pris saknas' : kr(t.total)} (${KO.PAYMENT_LABELS[o.payment].toLowerCase()})`, o.phone ? `Telefon: ${o.phone}` : '', o.email ? `E-post: ${o.email}` : '', o.note ? `Önskemål: ${o.note}` : '', o.internalNote ? `Intern anteckning: ${KO.plainLinks(o.internalNote)}` : ''].filter(Boolean).join('\n');
   return { summary: `B${o.nr} ${o.name}, ${o.kind === 'leverans' ? 'leverans' : 'hämtning'}`, description, location: o.kind === 'leverans' ? o.address : (state.settings.adress || '') };
 }
 function calendarDialog(o) {
@@ -1096,6 +1146,7 @@ function calendarDialog(o) {
   if (!o.pickupDate) { toast('Ange dag för beställningen först', 'bad'); orderDialog(o.id); return; }
   const info = orderEventInfo(o);
   const m = openModal({ title: 'Lägg i kalendern', body: `<p class="modal-text"><b>${esc(info.summary)}</b><br>${esc(KO.longDay(o.pickupDate))}${o.pickupTime ? ` kl. ${KO.svTime(o.pickupTime)}` : ', hela dagen'}</p>
+    ${calOn() ? `<p class="notice">Synken är på. Beställningen finns redan i kalendern ${esc(calName())} och uppdateras när du ändrar den. Knapparna nedan lägger in en extra kopia.</p>` : ''}
     <div class="btn-row"><button class="btn primary" data-google>Google Kalender</button><button class="btn" data-ics>Kalenderfil (.ics)</button></div>
     <p class="hint">Google Kalender öppnas med händelsen ifylld, och du sparar den där. Kalenderfilen öppnas i Kalender på Mac och i Outlook. På iPad väljer du Spara i Filer och trycker sedan på filen.${o.icsSeq ? ' Har du ändrat dag eller tid sedan du lade in den, ta bort den gamla händelsen i kalendern.' : ''}</p>`, footer: '<button class="btn ghost" data-close>Stäng</button>' });
   $('[data-google]', m.el).addEventListener('click', () => { window.open(KO.googleCalendarUrl(o, info), '_blank', 'noopener'); m.close(); });
@@ -1270,24 +1321,26 @@ function productsCsv() {
 function prodSeg() { return `<div class="seg page-seg"><button class="seg-btn ${ui.prodTab === 'produkter' ? 'is-active' : ''}" data-action="prod-tab" data-id="produkter">Produkter</button><button class="seg-btn ${ui.prodTab === 'koder' ? 'is-active' : ''}" data-action="prod-tab" data-id="koder">Rabattkoder</button></div>`; }
 function codeCtx() { return { today: dayKey(), receipts: state.receipts, orders: state.preorders }; }
 function codeUsage(c) { return KassaRabatt.usage(c, { receipts: state.receipts, orders: state.preorders }); }
+function codeStatus(c, u = codeUsage(c)) { return KassaRabatt.status(c, dayKey(), u.count + u.reserved); }
 const shortDate = (iso) => new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short' }).format(new Date(iso));
 function codeValidity(c) {
   const f = c.validFrom ? shortDate(c.validFrom + 'T12:00:00') : ''; const t = c.validTo ? shortDate(c.validTo + 'T12:00:00') : '';
   return f && t ? `Gäller ${f}–${t}` : f ? `Gäller från ${f}` : t ? `Gäller till och med ${t}` : 'Gäller tills vidare';
 }
 function codeCard(c) {
-  const st = KassaRabatt.status(c, dayKey()); const u = codeUsage(c);
-  const stats = u.count ? `${u.count} ${u.count === 1 ? 'gång' : 'gånger'} · ${kr(u.amount)} i rabatt · senast ${shortDate(u.last)}` : 'Inte använd ännu';
+  const u = codeUsage(c); const st = codeStatus(c, u);
+  const times = (n) => (n === 1 ? 'gång' : 'gånger');
+  const stats = u.count ? `<b>Använd ${u.count}${c.maxUses ? ` av ${c.maxUses}` : ''} ${times(c.maxUses || u.count)}</b> · ${kr(u.amount)} i rabatt · senast ${shortDate(u.last)}` : 'Inte använd ännu';
   return `<div class="code-card ${st === 'aktiv' ? '' : 'is-off'}">
     <div class="code-top"><span class="code-big">${esc(c.code)}</span><span class="code-value">${esc(KassaRabatt.describe(c))}</span></div>
     <div class="code-meta"><span class="badge cs-${st}">${KassaRabatt.STATUS_LABELS[st]}</span>${c.label ? `<span>${esc(c.label)}</span>` : ''}<span>${esc(codeValidity(c))}</span>${c.maxUses ? `<span>Max ${c.maxUses} ${c.maxUses === 1 ? 'gång' : 'gånger'}</span>` : ''}</div>
-    <div class="code-stats">${esc(stats)}${u.reserved ? ` · ${u.reserved} ${u.reserved === 1 ? 'reserverad' : 'reserverade'} i beställningar` : ''}</div>
+    <div class="code-stats">${stats}${u.reserved ? ` · ${u.reserved} ${u.reserved === 1 ? 'reserverad' : 'reserverade'} i beställningar` : ''}</div>
     <div class="code-actions"><button class="btn small" data-action="code-copy" data-id="${c.id}">Kopiera</button><button class="btn small" data-action="code-usage" data-id="${c.id}">Användning</button><button class="btn small" data-action="code-edit" data-id="${c.id}">Ändra</button></div>
   </div>`;
 }
 function renderKoder() {
-  const order = { aktiv: 0, kommande: 1, utgangen: 2, inaktiv: 3 }; const today = dayKey();
-  const list = state.codes.slice().sort((a, b) => (order[KassaRabatt.status(a, today)] - order[KassaRabatt.status(b, today)]) || String(b.created).localeCompare(String(a.created)));
+  const order = { aktiv: 0, kommande: 1, forbrukad: 2, utgangen: 3, inaktiv: 4 }; const st = new Map(state.codes.map((c) => [c.id, codeStatus(c)]));
+  const list = state.codes.slice().sort((a, b) => (order[st.get(a.id)] - order[st.get(b.id)]) || String(b.created).localeCompare(String(a.created)));
   return `${prodSeg()}<div class="page-head"><h1>Rabattkoder</h1><div class="toolbar"><button class="btn primary" data-action="code-new">Ny rabattkod</button></div></div>
   <p class="lead">Koderna används i kassan under Rabatt. Hur ofta en kod använts och hur mycket rabatt den gett räknas fram ur kvittona, så makulerade köp räknas inte.</p>
   ${list.length ? `<div class="code-list">${list.map(codeCard).join('')}</div>` : '<div class="empty">Inga rabattkoder ännu. Tryck Ny rabattkod för att skapa en, till exempel till en kampanj på Instagram.</div>'}`;
@@ -1666,9 +1719,26 @@ function renderInstallningar() {
             <li>Ändrar du skriptet senare: Distribuera, <b>Hantera distributioner</b>, pennan, Version: <b>Ny version</b>, Distribuera. Adressen förblir densamma.</li>
             <li><b>Mejla kvitton:</b> har du kopplat Drive före version 1.6, ersätt koden i skriptet med den nya nedan, spara, och gör en ny version enligt punkten ovan. Godkänn att skriptet får skicka e-post. Testa anslutningen visar sedan att kvitton kan mejlas.</li>
           </ol>
-          <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV. Skriptet är version 3 och används också av fakturaappen, som sparar sina kopior i undermappen <b>Fakturor</b>.</p>
+          <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV. Skriptet är version 4 och används också av fakturaappen, som sparar sina kopior i undermappen <b>Fakturor</b>. Det lägger även beställningarna i Google Kalender, se kortet nedan.</p>
           <div class="btn-row"><button class="btn" data-action="copy-script">Kopiera skriptet</button></div>
           <pre class="code" id="drive-script">${esc(driveScriptText())}</pre>
+        </details>
+      </div>
+      <div class="card"><h2>Google Kalender</h2>
+        <p class="fine">Beställningar med datum läggs automatiskt i en egen kalender i ditt Google-konto, och flyttas eller tas bort när du ändrar dem i kassan. Din vanliga kalender rörs inte. Kalendern använder samma skript som Google Drive.</p>
+        <div id="cal-status" class="status-line ${calStatus().cls}">${esc(calStatus().text)}</div>
+        <label class="check"><input type="checkbox" data-setting="calSync" ${s.calSync ? 'checked' : ''}> Synka beställningar till Google Kalender</label>
+        ${f('calName', 'Kalenderns namn', { attrs: `spellcheck="false" placeholder="${esc(CAL_DEFAULT)}"` })}
+        <div class="btn-row"><button class="btn" data-action="cal-now">Synka nu</button></div>
+        <details class="howto"><summary>Så slår du på kalendern, görs en gång på datorn</summary>
+          <ol class="steps">
+            <li>Koppla Google Drive enligt kortet ovan, om du inte redan gjort det.</li>
+            <li>Tryck <b>Kopiera skriptet</b> under Google Drive. Öppna ditt projekt på <b>script.google.com</b>, markera all kod, klistra in den nya och spara med Ctrl+S. Det är version 4.</li>
+            <li>Välj funktionen <b>godkann</b> i listan i verktygsraden och tryck <b>Kör</b>. Godkänn att skriptet får hantera dina kalendrar: välj kontot, <b>Avancerat</b>, <i>Fortsätt till projektet</i>, <b>Tillåt</b>.</li>
+            <li>Distribuera, <b>Hantera distributioner</b>, pennan, Version: <b>Ny version</b>, Distribuera. Adressen förblir densamma.</li>
+            <li>Bocka i rutan ovan. Kalendern <b>${esc(CAL_DEFAULT)}</b> skapas och syns i Google Kalender på alla dina enheter. Där kan du ge den en egen färg.</li>
+          </ol>
+          <p class="fine">Frågar Google inte om lov för kalendern i steg 3: öppna <b>myaccount.google.com/connections</b>, ta bort åtkomsten för skriptet och kör godkann igen. Beställningar äldre än 60 dagar skickas inte, men ligger kvar i kalendern om de redan finns där.</p>
         </details>
       </div>
       <div class="card"><h2>Installera som app</h2>
@@ -1695,9 +1765,10 @@ function saveSetting(key, el, quiet = false) {
   else if (key === 'driveKey') v = String(v).replace(/[^\w-]/g, '');
   else if (typeof v === 'string') v = v.trim();
   state.settings[key] = v; save(); if (!quiet) toast('Sparat');
-  if (key === 'driveUrl' || key === 'driveKey') driveMailCapable = null;
-  if (key.startsWith('drive')) { updateDriveStatus(); if (key === 'driveKey') { const pre = $('#drive-script'); if (pre) pre.textContent = driveScriptText(); } }
+  if (key === 'driveUrl' || key === 'driveKey') drivePingCache = null;
+  if (key.startsWith('drive')) { updateDriveStatus(); updateCalStatus(); if (key === 'driveKey') { const pre = $('#drive-script'); if (pre) pre.textContent = driveScriptText(); } }
   else touchBackup();
+  if (key === 'calSync' || key === 'calName') { calForce(); updateCalStatus(); touchCalendar(key === 'calSync'); }
 }
 
 // ---------- Modals & dialogs ----------
@@ -1925,17 +1996,20 @@ const PREVIEW_MSG = 'Det här är förhandsvisningen på claude.ai, och den får
 function driveConfigured() { return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec\/?$/.test((state.settings.driveUrl || '').trim()); }
 function backupObject() { return { app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }; }
 function driveScriptText() {
-  return `// lil'bakery Kassa och Faktura, version 3: sparar säkerhetskopior på Google Drive och mejlar kvitton och fakturor.
+  return `// lil'bakery Kassa och Faktura, version 4: sparar säkerhetskopior på Google Drive, mejlar kvitton och fakturor och lägger beställningar i Google Kalender.
 const NYCKEL = '${state.settings.driveKey || ''}';   // samma nyckel i kassans och fakturaappens inställningar
 const MAPP = "lil'bakery Kassa";        // mappen skapas i Min enhet på Google Drive
 const FAKTURAMAPP = 'Fakturor';         // undermapp i MAPP för fakturaappens kopior och PDF:er
+const KALENDER = "lil'bakery beställningar";   // kassans kalender, skapas om den saknas
 
 // Kassan skickar utan app, fakturaappen med app: 'faktura'. Båda mejlar med action: 'mail'.
+// Kassan lägger beställningar i kalendern med action: 'kalender'.
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     if (data.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
     if (data.action === 'mail') return skickaMejl(data);
+    if (data.action === 'kalender') return synkaKalender(data);
     if (data.app === 'faktura') return sparaFaktura(data);
     if (!data.backup || typeof data.backup !== 'object') return svar({ ok: false, error: 'Kopian saknas' });
     const mapp = hamtaMapp();
@@ -1949,7 +2023,7 @@ function doPost(e) {
 }
 function doGet(e) {
   if (!e.parameter || e.parameter.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
-  if (e.parameter.action === 'ping') return svar({ ok: true, mail: true, version: 3, faktura: true });
+  if (e.parameter.action === 'ping') return svar({ ok: true, mail: true, version: 4, faktura: true, kalender: true });
   const faktura = e.parameter.app === 'faktura';
   const mapp = faktura ? hamtaFakturamapp() : hamtaMapp();
   const filer = mapp.getFilesByName(faktura ? 'faktura-backup-senaste.json' : 'kassa-backup-senaste.json');
@@ -1983,6 +2057,53 @@ function skickaMejl(data) {
   MailApp.sendEmail({ to: data.to, subject: data.subject || 'Kvitto', body: data.text || '', htmlBody: data.html || undefined, name: data.from || "lil'bakery", attachments: bilagor });
   return svar({ ok: true, sent: new Date().toISOString() });
 }
+// Kassans beställningar blir händelser i en egen kalender. Kopplingen beställning → händelse sparas
+// i skriptets egenskaper, så att samma händelse flyttas eller tas bort när beställningen ändras.
+function synkaKalender(data) {
+  const kal = hamtaKalender(data.kalender);
+  const props = PropertiesService.getScriptProperties();
+  const tz = data.tz || kal.getTimeZone() || Session.getScriptTimeZone();
+  const nyckel = function (id) { return 'kal_' + kal.getId() + '|' + id; };
+  const hitta = function (id) { const evId = props.getProperty(nyckel(id)); try { return evId ? kal.getEventById(evId) : null; } catch (err) { return null; } };
+  const klara = []; const fel = [];
+  (data.bort || []).forEach(function (id) {
+    try {
+      const ev = hitta(id);
+      if (ev) ev.deleteEvent();
+      props.deleteProperty(nyckel(id));
+      klara.push(id);
+    } catch (err) { fel.push({ id: id, error: String(err) }); }
+  });
+  (data.handelser || []).forEach(function (h) {
+    try {
+      // Heldag räknas från klockan tolv, så att dagen blir rätt i alla tidszoner.
+      const start = Utilities.parseDate(h.datum + ' ' + (h.tid || '12:00'), tz, 'yyyy-MM-dd HH:mm');
+      const slut = new Date(start.getTime() + (Number(h.minuter) || 30) * 60000);
+      const opt = { description: h.beskrivning || '', location: h.plats || '' };
+      let ev = hitta(h.id);
+      if (ev) {
+        try {
+          if (ev.isAllDayEvent() === Boolean(h.tid)) { ev.deleteEvent(); ev = null; }   // heldag blev tid eller tvärtom
+          else {
+            ev.setTitle(h.titel); ev.setDescription(opt.description); ev.setLocation(opt.location);
+            if (h.tid) ev.setTime(start, slut); else ev.setAllDayDate(start);
+          }
+        } catch (err) { ev = null; }   // händelsen har tagits bort i kalendern, skapa en ny
+      }
+      if (!ev) ev = h.tid ? kal.createEvent(h.titel, start, slut, opt) : kal.createAllDayEvent(h.titel, start, opt);
+      props.setProperty(nyckel(h.id), ev.getId());
+      klara.push(h.id);
+    } catch (err) { fel.push({ id: h.id, error: String(err) }); }
+  });
+  return svar({ ok: true, klara: klara, fel: fel, kalender: kal.getName() });
+}
+function hamtaKalender(namn) {
+  const n = String(namn || '').trim() || KALENDER;
+  const finns = CalendarApp.getCalendarsByName(n);
+  return finns.length ? finns[0] : CalendarApp.createCalendar(n);
+}
+// Kör godkann en gång i redigeraren efter en uppdatering, så frågar Google om lov för Drive, e-post och kalender.
+function godkann() { hamtaMapp(); MailApp.getRemainingDailyQuota(); hamtaKalender(); }
 function hamtaMapp() { const it = DriveApp.getFoldersByName(MAPP); return it.hasNext() ? it.next() : DriveApp.createFolder(MAPP); }
 function hamtaFakturamapp() { const mapp = hamtaMapp(); const it = mapp.getFoldersByName(FAKTURAMAPP); return it.hasNext() ? it.next() : mapp.createFolder(FAKTURAMAPP); }
 function skriv(mapp, namn, innehall) { const it = mapp.getFilesByName(namn); if (it.hasNext()) it.next().setContent(innehall); else mapp.createFile(namn, innehall, MimeType.PLAIN_TEXT); }
@@ -2000,6 +2121,7 @@ function driveStatus() {
 }
 function updateDriveStatus() { const el = $('#drive-status'); if (!el) return; const st = driveStatus(); el.className = `status-line ${st.cls}`; el.textContent = st.text; }
 function touchBackup(opts = {}) {
+  touchCalendar();
   if (opts.csvDay) state.meta.driveCsvDay = opts.csvDay;
   if (IN_PREVIEW || !driveConfigured() || !state.settings.driveAuto) return;
   state.meta.drivePending = true; save(); updateDriveStatus();
@@ -2057,8 +2179,9 @@ async function driveTest() {
     else if (json.error === 'Ingen kopia finns') msg = 'Anslutningen fungerar. Ingen kopia har skickats ännu.';
     else if (json.error === 'Fel nyckel') throw new Error('Skriptet svarar men nyckeln stämmer inte. Nyckeln i fältet ovan måste vara exakt samma som NYCKEL i skriptet.');
     else throw new Error(json.error || 'Skriptet svarade med fel');
-    driveMailCapable = null; let canMail = false; try { canMail = await driveCanMail(); } catch (e) { canMail = false; }
-    toast(msg + (canMail ? ' Kvitton kan mejlas.' : ' För att mejla kvitton behöver skriptet uppdateras, se instruktionen nedan.'), 'ok', { duration: 10000 });
+    drivePingCache = null; let ping = { ok: false }; try { ping = await drivePing(); } catch (e) { ping = { ok: false }; }
+    toast(msg + (ping.mail === true ? ' Kvitton kan mejlas.' : ' För att mejla kvitton behöver skriptet uppdateras, se instruktionen nedan.') + (ping.kalender === true ? ' Kalendern kan synkas.' : state.settings.calSync ? ' För kalendern behöver skriptet uppdateras till version 4.' : ''), 'ok', { duration: 10000 });
+    updateCalStatus();
   } catch (e) { toast('Anslutningen misslyckades: ' + friendlyDriveError(e), 'bad', { duration: 12000 }); }
 }
 async function driveRestore() {
@@ -2073,6 +2196,82 @@ function afterClosingSaved(day) {
   if (driveConfigured() && state.settings.driveAuto) { touchBackup({ csvDay: day, now: true }); toast('Dagsavslut sparat. Kopia skickas till Google Drive.'); }
   else if (driveConfigured()) { state.meta.driveCsvDay = day; save(); toast('Dagsavslut sparat. Tryck Kopiera nu under Inställningar för att skicka till Drive.'); }
   else toast('Dagsavslut sparat. Kom ihåg att spara en säkerhetskopia under Inställningar.', 'ok', { duration: 6000 });
+}
+
+// ---------- Google Kalender via samma skript ----------
+// Beställningar med datum blir händelser i en egen kalender. state.meta.calSent = { orderId: kontrollsumma }
+// för det som senast skickats, så att bara ändringar skickas. Äldre än 60 dagar lämnas som de är i kalendern.
+const CAL_DEFAULT = "lil'bakery beställningar";
+const CAL_BATCH = 25; const CAL_DAYS_BACK = 60;
+let calTimer = null; let calBusy = false; let calAgain = false;
+function calName() { return String(state.settings.calName || '').trim() || CAL_DEFAULT; }
+function calOn() { return !!state.settings.calSync && driveConfigured() && !IN_PREVIEW; }
+function calPlan() {
+  const sent = state.meta.calSent || {}; const from = shiftDay(dayKey(), -CAL_DAYS_BACK);
+  const events = {}; const old = new Set();
+  for (const o of state.preorders) {
+    if (o.pickupDate && o.pickupDate < from) { old.add(o.id); continue; }
+    const t = orderTotals(o);
+    events[o.id] = KO.calendarEvent(o, { total: t.total, missing: t.missing, formatKr: kr });
+  }
+  return KO.calendarChanges(events, Object.fromEntries(Object.entries(sent).filter(([id]) => !old.has(id))));
+}
+// Allt skickas igen vid nästa synk (borttagningar räknas fortfarande), t.ex. efter byte av kalender.
+function calForce() { const sent = state.meta.calSent || (state.meta.calSent = {}); Object.keys(sent).forEach((id) => { sent[id] = '-'; }); save(); }
+function touchCalendar(now) {
+  if (!calOn()) return;
+  clearTimeout(calTimer); calTimer = setTimeout(() => calSync().catch(() => {}), now ? 300 : 5000);
+}
+function calStatus() {
+  const m = state.meta;
+  if (IN_PREVIEW) return { cls: 'warn', text: PREVIEW_MSG };
+  if (!state.settings.calSync) return { cls: '', text: 'Avstängd. Beställningarna läggs inte in i Google Kalender.' };
+  if (!driveConfigured()) return { cls: 'warn', text: 'Koppla Google Drive först. Kalendern använder samma skript.' };
+  if (calBusy) return { cls: '', text: 'Uppdaterar kalendern…' };
+  const last = m.calLastOk ? `Senast uppdaterad ${m.calLastOk.slice(0, 10)} ${timeOf(m.calLastOk)}.` : 'Inte synkad ännu.';
+  if (m.calLastError) return { cls: 'warn', text: `${last} ${m.calLastError}` };
+  return { cls: m.calLastOk ? 'ok' : '', text: `${last} Kalender: ${calName()}.` };
+}
+function updateCalStatus() { const el = $('#cal-status'); if (!el) return; const st = calStatus(); el.className = `status-line ${st.cls}`; el.textContent = st.text; }
+async function calSync(opts = {}) {
+  if (!calOn()) { if (opts.toast) toast(IN_PREVIEW ? PREVIEW_MSG : !driveConfigured() ? 'Koppla Google Drive först. Kalendern använder samma skript.' : 'Bocka i Synka beställningar till Google Kalender först.', 'bad', { duration: 9000 }); return false; }
+  if (calBusy) { calAgain = true; return false; }
+  if (navigator.onLine === false) { if (opts.toast) toast('Ingen uppkoppling. Kalendern uppdateras när nätet är tillbaka.', 'bad'); return false; }
+  const { upserts, deletes } = calPlan();
+  if (!upserts.length && !deletes.length) { if (state.meta.calLastError) { state.meta.calLastError = ''; save(); } updateCalStatus(); if (opts.toast) toast('Kalendern är redan uppdaterad'); return true; }
+  calBusy = true; updateCalStatus();
+  try {
+    if (opts.toast) drivePingCache = null;
+    const ping = await drivePing();
+    if (!ping.ok) throw new Error(ping.error === 'Fel nyckel' ? 'Nyckeln stämmer inte med skriptet.' : 'Skriptet svarar inte som det ska. Tryck Testa anslutningen under Google Drive.');
+    if (ping.kalender !== true) throw new Error('Skriptet i ditt Google-konto är en äldre version utan kalender. Uppdatera det enligt stegen nedan.');
+    const s = state.settings; const sent = state.meta.calSent || (state.meta.calSent = {}); const fel = [];
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || '';
+    const jobs = [...deletes.map((id) => ({ id })), ...upserts.map((ev) => ({ id: ev.id, ev }))];
+    for (let i = 0; i < jobs.length; i += CAL_BATCH) {
+      const part = jobs.slice(i, i + CAL_BATCH);
+      const body = { key: s.driveKey || '', action: 'kalender', kalender: calName(), tz, bort: part.filter((j) => !j.ev).map((j) => j.id), handelser: part.filter((j) => j.ev).map((j) => j.ev) };
+      const json = await driveJson(s.driveUrl.trim(), { method: 'POST', body: JSON.stringify(body) });
+      if (!json || !json.ok) throw new Error((json && json.error) || 'Skriptet svarade med fel');
+      const done = new Set(json.klara || []);
+      body.bort.forEach((id) => { if (done.has(id)) delete sent[id]; });
+      body.handelser.forEach((ev) => { if (done.has(ev.id)) sent[ev.id] = KO.hash(ev); });
+      fel.push(...(json.fel || []));
+      save();
+    }
+    state.meta.calLastOk = new Date().toISOString();
+    state.meta.calLastError = fel.length ? `${fel.length} ${fel.length === 1 ? 'beställning kunde' : 'beställningar kunde'} inte läggas in: ${fel[0].error}` : '';
+    save();
+    if (opts.toast) toast(fel.length ? state.meta.calLastError : `Kalendern ${calName()} är uppdaterad`, fel.length ? 'bad' : 'ok', { duration: fel.length ? 12000 : 4000 });
+    return !fel.length;
+  } catch (e) {
+    state.meta.calLastError = friendlyDriveError(e); save();
+    if (opts.toast) toast('Kunde inte uppdatera kalendern: ' + state.meta.calLastError, 'bad', { duration: 12000 });
+    return false;
+  } finally {
+    calBusy = false; updateCalStatus();
+    if (calAgain) { calAgain = false; touchCalendar(); }
+  }
 }
 
 // ---------- Kvitto som PDF och e-post ----------
@@ -2197,6 +2396,150 @@ async function receiptsPdfBlob(list) {
   list.forEach((r, i) => { if (i) doc.addPage([PAGE.w, heights[i]], 'p'); drawReceipt(doc, r, logo, F, true, heights[i]); });
   return doc.output('blob');
 }
+// Orderbekräftelsen i kvittots form. Med D = false mäts bara höjden. pageH = 0 lägger sidfoten direkt efter innehållet.
+function drawConfirmation(doc, o, kind, logo, F, D, pageH) {
+  const s = state.settings; const W = PAGE.w; const M = PAGE.m; const R = W - M; const CW = W - 2 * M; const T = F.unicode ? pdfText : pdfLatin;
+  const font = (bold, size, color) => { doc.setFont(F.body, bold ? 'bold' : 'normal'); doc.setFontSize(size); const c = color || COL.ink; doc.setTextColor(c[0], c[1], c[2]); };
+  const text = (t, x, y, opts) => { if (D) doc.text(T(t), x, y, opts || {}); };
+  const wrap = (t, w) => doc.splitTextToSize(T(t), w);
+  const hr = (y, c, lw) => { if (!D) return; const k = c || COL.line; doc.setDrawColor(k[0], k[1], k[2]); doc.setLineWidth(lw || 0.25); doc.line(M, y, R, y); };
+  const caps = (t, x, y, opts) => { doc.setCharSpace(0.5); text(t.toUpperCase(), x, y, opts); doc.setCharSpace(0); };
+  const t = orderTotals(o); const v = KO.templateVars(o, { foretag: s.foretag, swish: s.swish ? formatSwish(s.swish) : '', formatKr: kr, total: t.total, discountAmount: t.discountAmount });
+  let y = M;
+  // Sidhuvud som på kvittot
+  const logoW = 32; const logoH = logo ? logoW * logo.ratio : 0;
+  if (logo) { if (D) doc.addImage(logo.data, 'PNG', M - 1, y - 2, logoW, logoH, 'logo'); }
+  else { font(true, 18, COL.brand); text(s.foretag, M, y + 9); }
+  font(true, 24, COL.ink); text(kind === 'paminnelse' ? 'Påminnelse' : 'Bekräftelse', R, y + 11, { align: 'right' });
+  font(false, 10, COL.muted); text(`beställning ${v.nr}`, R, y + 17.5, { align: 'right' });
+  const pill = o.status === 'avbokad' ? ['AVBOKAD', COL.red] : o.payment === 'betald' ? ['BETALD', COL.brand] : o.payment === 'faktura' ? ['FAKTURERAS', COL.brand] : null;
+  if (pill) {
+    font(true, 8.5, [255, 255, 255]); const w = doc.getTextWidth(pill[0]) + 6;
+    if (D) { doc.setFillColor(pill[1][0], pill[1][1], pill[1][2]); doc.roundedRect(R - w, y + 21, w, 6, 3, 3, 'F'); }
+    text(pill[0], R - w / 2, y + 25.1, { align: 'center' });
+  }
+  y += Math.max(logoH, 28) + 5;
+  // Kund och beställning
+  const colR = M + CW / 2 + 8;
+  font(true, 7, COL.muted); caps('Kund', M, y); caps('Beställning', colR, y);
+  let yl = y + 6; let yr = y + 6;
+  font(true, 11, COL.ink); wrap(v.fullnamn, CW / 2 - 2).forEach((part) => { text(part, M, yl); yl += 5.2; });
+  font(false, 8.8, COL.muted);
+  [o.phone, o.email, o.kind === 'leverans' && o.address ? `Leverans till ${o.address}` : ''].filter(Boolean).forEach((x) => wrap(x, CW / 2 - 2).forEach((part) => { text(part, M, yl); yl += 4.3; }));
+  const kv = (k, val) => { font(false, 8.8, COL.muted); text(k, colR, yr); font(true, 8.8, COL.ink); const parts = wrap(val, R - colR - 18); parts.forEach((part, i) => text(part, R, yr + i * 4.3, { align: 'right' })); yr += 4.3 * parts.length + 0.6; };
+  kv(o.kind === 'leverans' ? 'Leverans' : 'Hämtning', v.datum || 'bestäms senare'); if (v.tid) kv('Tid', `kl. ${v.tid}`);
+  kv('Betalning', o.payment === 'betald' ? 'Betald' : o.payment === 'faktura' ? 'Faktura' : 'Swish eller kontant');
+  y = Math.max(yl, yr) + 5;
+  // Varor
+  const cA = M + 3; const cQty = M + 72; const cPrice = M + 94; const cSum = R - 3;
+  if (D) { doc.setFillColor(COL.mist[0], COL.mist[1], COL.mist[2]); doc.roundedRect(M, y, CW, 8, 2, 2, 'F'); }
+  font(true, 7, COL.muted); caps('Vara', cA, y + 5.2); caps('Antal', cQty, y + 5.2, { align: 'right' }); caps('À-pris', cPrice, y + 5.2, { align: 'right' }); caps('Belopp', cSum, y + 5.2, { align: 'right' });
+  y += 8;
+  o.lines.forEach((l) => {
+    const noPrice = l.price === null || l.price === undefined || l.price === '';
+    font(false, 9.8, COL.ink); const parts = wrap(l.name || 'Namnlös rad', cQty - cA - 14); const ty = y + 5.6;
+    parts.forEach((part, i) => text(part, cA, ty + i * 4.5));
+    text(String(l.qty), cQty, ty, { align: 'right' }); text(noPrice ? '–' : nf2.format(l.price), cPrice, ty, { align: 'right' });
+    font(true, 9.8, noPrice ? COL.muted : COL.ink); text(noPrice ? 'pris saknas' : nf2.format(r2(l.price * l.qty)), cSum, ty, { align: 'right' });
+    y += 4.5 * parts.length + 3.6; hr(y);
+  });
+  if (t.discount) {
+    font(false, 9.8, COL.pink); const parts = wrap(discountLabel(t.discount), cQty - cA - 12); const ty = y + 5.6;
+    parts.forEach((part, i) => text(part, cA, ty + i * 4.5)); font(true, 9.8, COL.pink); text('-' + nf2.format(t.discount.amount), cSum, ty, { align: 'right' });
+    y += 4.5 * parts.length + 3.6; hr(y);
+  }
+  // Summering
+  y += 8; const tx = colR;
+  const fitsRow = (k, val, size, bold) => { font(!!bold, size); return doc.getTextWidth(T(k)) + doc.getTextWidth(T(val)) + 4 <= cSum - tx; };
+  const row = (k, val, size, color, bold) => { let sz = size; while (sz > 7 && !fitsRow(k, val, sz, bold)) sz -= 0.25; font(!!bold, sz, color || COL.muted); text(k, tx, y); text(val, cSum, y, { align: 'right' }); };
+  if (t.discount) { row('Summa varor', kr2(t.gross), 9); y += 5; row(discountLabel(t.discount).replace(/^Rabattkod /, 'Kod '), '-' + kr2(t.discount.amount), 9, COL.pink); y += 5; }
+  if (D) { doc.setDrawColor(COL.brand[0], COL.brand[1], COL.brand[2]); doc.setLineWidth(0.5); doc.line(tx, y - 1, R, y - 1); }
+  y += 6.5;
+  { const lab = o.payment === 'betald' ? 'Betalt' : 'Att betala'; const big = t.missing ? 'pris saknas' : kr2(t.total); let sz = 14; while (sz > 12 && !fitsRow(lab, big, sz, true)) sz -= 0.5;
+    if (fitsRow(lab, big, sz, true)) { font(true, sz, COL.brand); text(lab, tx, y); text(big, cSum, y, { align: 'right' }); y += 7; }
+    else { font(true, 11, COL.brand); text(lab, tx, y); y += 7; font(true, 16, COL.brand); text(big, cSum, y, { align: 'right' }); y += 7.5; } }
+  if (!t.missing) t.vatLines.forEach((x) => { row(`Varav moms ${x.rate} %`, kr2(x.vat), 8.6); y += 4.6; });
+  // Rutor med betalning och önskemål
+  const box = (title, body, color) => {
+    y += 4; font(false, 9.4, COL.ink); const parts = wrap(body, CW - 12); const h = 11 + parts.length * 4.6;
+    if (D) { doc.setFillColor(color[0], color[1], color[2]); doc.roundedRect(M, y, CW, h, 3, 3, 'F'); }
+    font(true, 7, COL.muted); caps(title, M + 6, y + 6.5);
+    font(false, 9.4, COL.ink); parts.forEach((part, i) => text(part, M + 6, y + 12 + i * 4.6));
+    y += h;
+  };
+  box('Betalning', v.betalning, COL.mist);
+  if (o.note) box('Önskemål', o.note, [253, 243, 214]);
+  // Hälsning och sidfot
+  y += 12; doc.setFont(F.script, F.scriptStyle); doc.setFontSize(F.unicode ? 24 : 14); doc.setTextColor(COL.brand[0], COL.brand[1], COL.brand[2]);
+  text(o.status === 'avbokad' ? 'Välkommen åter!' : 'Tack för din beställning!', W / 2, y, { align: 'center' }); y += F.unicode ? 8 : 6;
+  const c = receiptContact(); const fy = pageH ? Math.max(y + 10, pageH - (c.line2 ? 15 : 12)) : y + 10;
+  hr(fy - 5);
+  font(false, 7.6, COL.muted); text(c.line1, W / 2, fy, { align: 'center' }); if (c.line2) text(c.line2, W / 2, fy + 3.8, { align: 'center' });
+  return fy + (c.line2 ? 3.8 : 0) + 8;
+}
+// Samma ritanrop som jsPDF (det som kvitto och bekräftelse använder), men på en canvas. Mått i millimeter.
+function canvasDoc(ctx, scale, images) {
+  const PT = 25.4 / 72; const st = { family: 'Nunito', style: 'normal', size: 10, space: 0, color: '#000', fill: '#000', stroke: '#000', lw: 0.2 };
+  const rgb = (r, g, b) => `rgb(${r},${g},${b})`;
+  const apply = () => { ctx.font = `${st.style === 'bold' ? 800 : 400} ${st.size * PT * scale}px ${st.family === 'Sacramento' ? 'KassaSacramento, cursive' : 'KassaNunito, Arial, sans-serif'}`; };
+  const width = (t) => { apply(); return ctx.measureText(t).width / scale; };
+  const path = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+  return {
+    setFont(f, style) { st.family = f; st.style = style || 'normal'; },
+    setFontSize(n) { st.size = n; },
+    setTextColor(r, g, b) { st.color = rgb(r, g, b); },
+    setFillColor(r, g, b) { st.fill = rgb(r, g, b); },
+    setDrawColor(r, g, b) { st.stroke = rgb(r, g, b); },
+    setLineWidth(n) { st.lw = n; },
+    setCharSpace(n) { st.space = n; },
+    getTextWidth: width,
+    splitTextToSize(t, max) {
+      const out = [];
+      String(t).split('\n').forEach((para) => {
+        let line = '';
+        para.split(/\s+/).filter(Boolean).forEach((word) => {
+          const next = line ? `${line} ${word}` : word;
+          if (!line || width(next) <= max) { line = next; return; }
+          out.push(line); line = word;
+        });
+        out.push(line);
+      });
+      return out;
+    },
+    text(t, x, y, opts = {}) {
+      apply(); ctx.fillStyle = st.color; ctx.textBaseline = 'alphabetic';
+      const chars = [...String(t)]; const w = width(t) + (st.space ? st.space * chars.length : 0);
+      let cx = opts.align === 'right' ? x - w : opts.align === 'center' ? x - w / 2 : x;
+      if (!st.space) { ctx.fillText(t, cx * scale, y * scale); return; }
+      chars.forEach((ch) => { ctx.fillText(ch, cx * scale, y * scale); cx += width(ch) + st.space; });
+    },
+    line(x1, y1, x2, y2) { ctx.strokeStyle = st.stroke; ctx.lineWidth = st.lw * scale; ctx.beginPath(); ctx.moveTo(x1 * scale, y1 * scale); ctx.lineTo(x2 * scale, y2 * scale); ctx.stroke(); },
+    roundedRect(x, y, w, h, rx, ry, style) { path(x * scale, y * scale, w * scale, h * scale, Math.min(rx, w / 2, h / 2) * scale); if (/F/.test(style || '')) { ctx.fillStyle = st.fill; ctx.fill(); } if (!style || /S|D/.test(style)) { ctx.strokeStyle = st.stroke; ctx.lineWidth = st.lw * scale; ctx.stroke(); } },
+    addImage(data, type, x, y, w, h) { const img = images.get(data); if (img) ctx.drawImage(img, x * scale, y * scale, w * scale, h * scale); }
+  };
+}
+let canvasFontsCache = null;
+function canvasFonts() {
+  if (!canvasFontsCache) {
+    canvasFontsCache = Promise.all([['KassaNunito', 'Nunito-Regular', '400'], ['KassaNunito', 'Nunito-ExtraBold', '800'], ['KassaSacramento', 'Sacramento-Regular', '400']]
+      .map(([family, file, weight]) => new FontFace(family, `url(vendor/fonts/${file}.ttf)`, { weight }).load().then((f) => { document.fonts.add(f); })))
+      .then(() => true).catch(() => { canvasFontsCache = null; return false; });
+  }
+  return canvasFontsCache;
+}
+// Bekräftelsen eller påminnelsen som PNG, 1184 px bred (8 px per mm), för att skicka i sms eller Instagram.
+async function confirmationPngBlob(o, kind = 'bekraftelse') {
+  const [logo] = await Promise.all([logoForPdf(), canvasFonts()]);
+  const images = new Map();
+  if (logo) { const img = new Image(); img.src = logo.data; try { await img.decode(); images.set(logo.data, img); } catch (e) { /* utan logga */ } }
+  const F = { body: 'Nunito', script: 'Sacramento', scriptStyle: 'normal', unicode: true }; const scale = 8;
+  const useLogo = images.size ? logo : null;
+  const h = Math.ceil(drawConfirmation(canvasDoc(document.createElement('canvas').getContext('2d'), scale, images), o, kind, useLogo, F, false, 0));
+  const canvas = document.createElement('canvas'); canvas.width = PAGE.w * scale; canvas.height = h * scale;
+  const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawConfirmation(canvasDoc(ctx, scale, images), o, kind, useLogo, F, true, 0);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Bilden kunde inte skapas'))), 'image/png'));
+}
 const receiptFileName = (r) => `kvitto-${r.nr}-${r.day}.pdf`;
 function receiptPlainText(r) {
   const s = state.settings; const c = receiptContact();
@@ -2243,33 +2586,37 @@ ${r.status === 'makulerad' ? `<div style="display:inline-block;margin-top:10px;p
 </table></td></tr></table></body></html>`;
 }
 const blobToBase64 = (blob) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
+// Delar filen på pekskärmar och laddar ner den på datorn. Ger true när den delats eller laddats ner.
 async function deliverFile(blob, name) {
-  if (IN_PREVIEW) { toast('Nedladdning fungerar i kassan på okiazee.github.io, inte i förhandsvisningen.', 'bad', { duration: 8000 }); return; }
+  if (IN_PREVIEW) { toast('Nedladdning fungerar i kassan på okiazee.github.io, inte i förhandsvisningen.', 'bad', { duration: 8000 }); return false; }
   const file = new File([blob], name, { type: blob.type || 'application/pdf' });
   if (isTouch() && navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); return; }
+    try { await navigator.share({ files: [file], title: name }); return true; }
     catch (e) {
-      if (e && e.name === 'AbortError') return;
+      if (e && e.name === 'AbortError') return false;
       const m = openModal({ title: 'Filen är klar', body: `<p class="modal-text">${esc(name)}</p><p class="hint">Tryck Dela eller spara och välj till exempel Spara i Filer, Mail eller Skriv ut.</p>`, footer: '<button class="btn ghost" data-close>Stäng</button><button class="btn primary" data-ok>Dela eller spara</button>' });
       $('[data-ok]', m.el).addEventListener('click', async () => { m.close(); try { await navigator.share({ files: [file], title: name }); } catch (err) { /* avbrutet */ } });
-      return;
+      return false;
     }
   }
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
   toast(`${name} är nedladdad`);
+  return true;
 }
 async function downloadReceipt(r, pdfPromise) {
   try { deliverFile(await (pdfPromise || receiptsPdfBlob([r])), receiptFileName(r)); }
   catch (e) { console.error(e); toast('Kunde inte skapa PDF. Kontrollera internet första gången, sedan fungerar det offline.', 'bad', { duration: 9000 }); }
 }
-let driveMailCapable = null;
-async function driveCanMail() {
-  if (driveMailCapable !== null) return driveMailCapable;
+// Skriptets svar på ping visar vad det kan: mail (version 2), faktura (3), kalender (4).
+let drivePingCache = null;
+async function drivePing() {
+  if (drivePingCache) return drivePingCache;
   const json = await driveJson(state.settings.driveUrl.trim() + '?key=' + encodeURIComponent(state.settings.driveKey || '') + '&action=ping&t=' + Date.now());
-  driveMailCapable = !!(json && json.ok && json.mail === true);
-  return driveMailCapable;
+  drivePingCache = json && json.ok ? json : { ok: false, error: (json && json.error) || '' };
+  return drivePingCache;
 }
+async function driveCanMail() { const json = await drivePing(); return !!(json && json.ok && json.mail === true); }
 function mailtoUrl(r, to) {
   const s = state.settings; const addr = String(to || '').replace(/[^\w.@+-]/g, '');
   return `mailto:${addr}?subject=${encodeURIComponent(`Kvitto #${r.nr} från ${s.foretag}`)}&body=${encodeURIComponent(receiptPlainText(r))}`;
@@ -2339,7 +2686,7 @@ async function applyBackup(data, sourceLabel) {
   n.nextReceiptNr = Math.max(n.nextReceiptNr || 1, ...n.receipts.map((r) => r.nr + 1), 1);
   const drive = { driveUrl: state.settings.driveUrl, driveKey: state.settings.driveKey, driveAuto: state.settings.driveAuto };
   state = n; if (!state.settings.driveUrl) Object.assign(state.settings, drive);
-  state.meta.drivePending = false; save(); toast('Kopian är återställd'); render(); return true;
+  state.meta.drivePending = false; calForce(); save(); toast('Kopian är återställd'); render(); touchCalendar(); return true;
 }
 function restore() {
   const input = document.createElement('input'); input.type = 'file'; input.accept = '.json,application/json';
@@ -2360,7 +2707,10 @@ async function wipe() {
   if (!choice) return;
   if (!(await requirePin('Radering kräver PIN'))) return;
   if (choice.deactivate) state.codes.forEach((c) => { c.active = false; });
-  state.receipts = []; state.closings = []; state.nextReceiptNr = 1; state.cart = { lines: [], discount: null }; state.preorders = state.preorders.filter((o) => KassaOrder.isOpen(o)); save(); toast('Kvitton och dagsavslut raderade'); render();
+  state.receipts = []; state.closings = []; state.nextReceiptNr = 1; state.cart = { lines: [], discount: null }; state.preorders = state.preorders.filter((o) => KassaOrder.isOpen(o));
+  // Raderade beställningar ligger kvar i Google Kalender som historik.
+  const kept = new Set(state.preorders.map((o) => o.id)); const sent = state.meta.calSent || {}; Object.keys(sent).forEach((id) => { if (!kept.has(id)) delete sent[id]; });
+  save(); toast('Kvitton och dagsavslut raderade'); render();
 }
 async function setPin() {
   if (state.settings.pin && !(await requirePin('Ange nuvarande PIN'))) return;
@@ -2415,6 +2765,7 @@ const actions = {
   'drive-test': () => driveTest(),
   'drive-now': () => { state.meta.driveCsvDay = state.meta.driveCsvDay || (state.closings.some((c) => c.day === dayKey()) ? dayKey() : null); driveUpload({ toast: true }); },
   'drive-restore': () => driveRestore(),
+  'cal-now': () => { calForce(); calSync({ toast: true }); },
   'copy-script': async () => { try { await navigator.clipboard.writeText(driveScriptText()); toast('Skriptet är kopierat. Klistra in det i script.google.com.'); } catch (e) { toast('Markera texten i rutan och kopiera den manuellt', 'bad'); } },
   preorder: () => preorderFromCart(),
   'po-pay': ({ id, el }) => { const o = findPo(id); if (o) openPreorderInCart(o, el.dataset.method === 'swish' ? paySwish : payCash); },
@@ -2482,6 +2833,8 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('online', updateOnline); window.addEventListener('offline', updateOnline);
 window.addEventListener('online', () => { if (state.meta.drivePending && driveConfigured() && state.settings.driveAuto) setTimeout(() => driveUpload().catch(() => {}), 2000); });
 if (state.meta.drivePending && driveConfigured() && state.settings.driveAuto) setTimeout(() => driveUpload().catch(() => {}), 6000);
+window.addEventListener('online', () => { if (calOn()) setTimeout(() => calSync().catch(() => {}), 3000); });
+if (calOn()) setTimeout(() => calSync().catch(() => {}), 7000);
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; if (ui.view === 'installningar') render(); });
 window.addEventListener('kassa:update', () => {
   const active = document.activeElement && document.activeElement.tagName;

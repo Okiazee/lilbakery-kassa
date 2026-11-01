@@ -146,3 +146,53 @@ test('mallar: bekräftelse och påminnelse utan undefined och utan dubbla tomrad
   assert.match(O.templateVars(order({ payment: 'betald' }), {}).betalning, /betald/);
   assert.match(O.templateVars(order(), {}).betalning, /^Du betalar med Swish eller kontant vid hämtningen\.$/);
 });
+
+test('länkar: [text](adress), bara adresser och www, skiljetecken efter länken hör inte till den', () => {
+  const parts = O.linkParts('Se [ritningen](https://example.com/a?b=1) och https://foto.se/x. Även www.kakor.se, klart.');
+  assert.deepEqual(parts, [
+    { type: 'text', text: 'Se ' },
+    { type: 'link', label: 'ritningen', url: 'https://example.com/a?b=1' },
+    { type: 'text', text: ' och ' },
+    { type: 'link', label: 'https://foto.se/x', url: 'https://foto.se/x' },
+    { type: 'text', text: '.' },
+    { type: 'text', text: ' Även ' },
+    { type: 'link', label: 'www.kakor.se', url: 'https://www.kakor.se' },
+    { type: 'text', text: ',' },
+    { type: 'text', text: ' klart.' }
+  ]);
+  assert.deepEqual(O.linkParts(''), []);
+  assert.deepEqual(O.linkParts('ingen länk här'), [{ type: 'text', text: 'ingen länk här' }]);
+  assert.deepEqual(O.linkParts('javascript:alert(1) och [x](javascript:alert(1))').filter((p) => p.type === 'link'), []);
+  assert.equal(O.links('a https://x.se b [c](https://y.se)').length, 2);
+  assert.equal(O.plainLinks('Se [ritningen](https://example.com/a) och https://foto.se'), 'Se ritningen: https://example.com/a och https://foto.se');
+});
+
+test('calendarEvent: titel, tid, heldag, status och ingen händelse utan datum eller vid avbokning', () => {
+  const o = order({ phone: '070', internalNote: 'Bild: [tårtan](https://ex.se/t.jpg)', note: 'Nötfri' });
+  const ev = O.calendarEvent(o, { total: 1250, formatKr: (n) => `${n} kr` });
+  assert.equal(ev.id, 'o1'); assert.equal(ev.titel, 'B12 Anna Testsson, hämtning');
+  assert.equal(ev.datum, '2026-11-08'); assert.equal(ev.tid, '14:00'); assert.equal(ev.minuter, 30);
+  assert.match(ev.beskrivning, /1 × Tårta, 20 bitar\n2 × Kaffe\nAtt betala: 1250 kr \(obetald\)/);
+  assert.match(ev.beskrivning, /Intern anteckning:\nBild: tårtan: https:\/\/ex\.se\/t\.jpg/);
+  assert.equal(O.calendarEvent(order({ pickupTime: '' }), { total: 1 }).tid, '');
+  assert.equal(O.calendarEvent(order({ status: 'ny' }), { total: 1 }).titel, 'B12 Anna Testsson, hämtning (ej bekräftad)');
+  assert.equal(O.calendarEvent(order({ status: 'utlamnad', payment: 'betald' }), { total: 1 }).titel, '✓ B12 Anna Testsson, hämtning');
+  assert.equal(O.calendarEvent(order({ kind: 'leverans', address: 'Storgatan 1' }), { total: 1 }).plats, 'Storgatan 1');
+  assert.equal(O.calendarEvent(order({ status: 'avbokad' }), {}), null);
+  assert.equal(O.calendarEvent(order({ pickupDate: '' }), {}), null);
+});
+
+test('calendarChanges: bara ändrade skickas, borttagna och avbokade raderas', () => {
+  const a = O.calendarEvent(order({ id: 'a' }), { total: 1 });
+  const b = O.calendarEvent(order({ id: 'b', nr: 13 }), { total: 1 });
+  let sent = {};
+  let ch = O.calendarChanges({ a, b, c: null }, sent);
+  assert.deepEqual(ch.upserts.map((e) => e.id), ['a', 'b']); assert.deepEqual(ch.deletes, []);
+  sent = { a: O.hash(a), b: O.hash(b) };
+  assert.deepEqual(O.calendarChanges({ a, b }, sent), { upserts: [], deletes: [] });
+  const a2 = { ...a, tid: '15:00' };
+  ch = O.calendarChanges({ a: a2, b: null }, sent);
+  assert.deepEqual(ch.upserts.map((e) => e.tid), ['15:00']); assert.deepEqual(ch.deletes, ['b']);
+  assert.deepEqual(O.calendarChanges({}, sent).deletes.sort(), ['a', 'b']);
+  assert.notEqual(O.hash(a), O.hash(a2));
+});

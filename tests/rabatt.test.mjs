@@ -76,6 +76,12 @@ test('status och validate: inaktiv, datumfönster med slutdagen inräknad, max a
   assert.equal(R.status(code({ validFrom: '2026-11-02' }), '2026-11-01'), 'kommande');
   assert.equal(R.status(code({ validTo: '2026-11-01' }), '2026-11-01'), 'aktiv');
   assert.equal(R.status(code({ validTo: '2026-10-31' }), '2026-11-01'), 'utgangen');
+  // Förbrukad när den använts (eller reserverats) så många gånger som tillåts.
+  assert.equal(R.status(code({ maxUses: 1 }), '2026-11-01', 1), 'forbrukad');
+  assert.equal(R.status(code({ maxUses: 2 }), '2026-11-01', 1), 'aktiv');
+  assert.equal(R.status(code({ maxUses: null }), '2026-11-01', 50), 'aktiv');
+  assert.equal(R.status(code({ maxUses: 1, active: false }), '2026-11-01', 1), 'inaktiv');
+  assert.equal(R.STATUS_LABELS.forbrukad, 'Förbrukad');
 
   assert.equal(R.validate(null, { today: '2026-11-01' }).ok, false);
   assert.equal(R.validate(code({ active: false }), { today: '2026-11-01' }).reason, 'inaktiv');
