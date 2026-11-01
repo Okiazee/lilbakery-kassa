@@ -133,7 +133,7 @@ test('mallar: bekräftelse och påminnelse utan undefined och utan dubbla tomrad
   assert.equal(vars.nar, 'söndag 8 november kl. 14.00');
   assert.equal(vars.plats, 'Hämtning');
   assert.equal(vars.artiklar, '1 × Tårta, 20 bitar: 1200 kr\n2 × Kaffe: 50 kr\nRabattkod FIKA25: -50 kr');
-  assert.match(vars.betalning, /swisha till 123 456 78 90 och märka betalningen B12/);
+  assert.equal(vars.betalning, 'Inbetalning på 1200 kr sker via Swish till 123 456 78 90. Beställningen gäller när betalningen har kommit in.');
   for (const key of Object.keys(O.TEMPLATE_LABELS)) {
     const text = O.render(O.DEFAULT_TEMPLATES[key], vars);
     assert.doesNotMatch(text, /undefined|null|\{[a-z]+\}/i);
@@ -147,7 +147,7 @@ test('mallar: bekräftelse och påminnelse utan undefined och utan dubbla tomrad
   assert.doesNotMatch(text, /\n\n\n/);
   assert.equal(O.render('Hej {namn}, {okand}!', { namn: 'Bo' }), 'Hej Bo, {okand}!');
   assert.match(O.templateVars(order({ payment: 'betald' }), {}).betalning, /betald/);
-  assert.match(O.templateVars(order(), {}).betalning, /^Du betalar med Swish vid hämtningen\.$/);
+  assert.equal(O.templateVars(order(), {}).betalning, 'Inbetalning sker via Swish. Beställningen gäller när betalningen har kommit in.');
 });
 
 test('länkar: [text](adress), bara adresser och www, skiljetecken efter länken hör inte till den', () => {

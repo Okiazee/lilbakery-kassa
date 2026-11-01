@@ -146,9 +146,9 @@
   }
 
   // ---------- Meddelanden ----------
-  const TEMPLATE_LABELS = { bekraftelse: 'Bekräftelse', paminnelse: 'Påminnelse' };
+  const TEMPLATE_LABELS = { bekraftelse: 'Beställningssummering', paminnelse: 'Påminnelse' };
   const DEFAULT_TEMPLATES = {
-    bekraftelse: 'Hej {namn}!\n\nTack för din beställning hos {foretag}. Här är din bekräftelse.\n\nBeställning {nr}\n{artiklar}\nAtt betala: {summa}\n\n{plats}: {nar}\n{onskemal}\n\n{betalning}\n\nHör av dig om något behöver ändras.\nVarma hälsningar\n{foretag}',
+    bekraftelse: 'Hej {namn}!\n\nBeställning {nr}\n{artiklar}\nAtt betala: {summa}\n\n{plats}: {nar}\n{onskemal}\n\n{betalning}\n\nHör av dig om något behöver ändras.\nVarma hälsningar\n{foretag}',
     paminnelse: 'Hej {namn}!\n\nEn påminnelse om din beställning {nr} hos {foretag}.\n\n{plats}: {nar}\n\n{artiklar}\nAtt betala: {summa}\n{betalning}\n\nVälkommen!\n{foretag}'
   };
   const PLACEHOLDERS = {
@@ -166,11 +166,10 @@
     const plats = o.kind === 'leverans' ? (o.address ? `Leverans till ${o.address}` : 'Leverans') : 'Hämtning';
     const rows = o.lines.map((l) => `${l.qty} × ${l.name}${l.price === null || l.price === undefined || l.price === '' ? '' : `: ${fmt(l.price * l.qty)}`}`);
     if (o.discount && ctx.discountAmount) rows.push(`${o.discount.reason || 'Rabatt'}: -${fmt(ctx.discountAmount)}`);
-    const when = o.kind === 'leverans' ? 'leveransen' : 'hämtningen';
     let betalning;
     if (o.payment === 'betald') betalning = 'Beställningen är betald. Tack!';
     else if (o.payment === 'faktura') betalning = 'Du får en faktura från oss.';
-    else betalning = `Du betalar med Swish vid ${when}.` + (ctx.swish ? ` Vill du betala i förväg går det bra att swisha till ${ctx.swish} och märka betalningen ${nr}.` : '');
+    else betalning = `Inbetalning${ctx.total === undefined ? '' : ` på ${fmt(ctx.total)}`} sker via Swish${ctx.swish ? ` till ${ctx.swish}` : ''}. Beställningen gäller när betalningen har kommit in.`;
     return {
       namn: String(o.name || '').trim().split(/\s+/)[0] || '', fullnamn: String(o.name || '').trim(), nr, datum, tid, nar, plats,
       artiklar: rows.join('\n'), summa: ctx.total === undefined ? '' : fmt(ctx.total), betalning,

@@ -144,13 +144,14 @@ kvar med samma nummer, som B1, B2 och så vidare.
   *Spara som beställning*.
 - Status: Ny, Bekräftad, Utlämnad och Avbokad. Betalning: i kassan eller
   faktureras. En ny beställning får sakna pris, men inte en bekräftad.
-- **Bekräfta** öppnar bekräftelsetexten. Den kan kopieras, delas eller mejlas, och
-  beställningen blir då bekräftad. Under *Meddelande* finns också en påminnelse.
+- **Bekräfta** öppnar beställningssummeringen. Den kan kopieras, delas eller mejlas,
+  och beställningen blir då bekräftad. Kunden får veta att inbetalning sker via
+  Swish och att beställningen gäller när betalningen har kommit in. Under *Meddelande* finns också en påminnelse.
   Texterna ändras under Inställningar.
 - **Kalender** visar månaden med antal beställningar per dag. Tryck på en dag för
   att se dess beställningar. Varje beställning kan läggas i Google Kalender eller
   sparas som kalenderfil (.ics), men enklast är den automatiska synken nedan.
-- **Spara som bild** i meddelandet skapar bekräftelsen eller påminnelsen som en
+- **Spara som bild** i meddelandet skapar summeringen eller påminnelsen som en
   PNG i samma utformning som kvittot, att skicka i sms, Messenger eller Instagram.
 - **Intern anteckning** syns bara för dig. Adresser som `https://…` och `www.…`
   blir klickbara, och *+ Länk* lägger in en länk med egen text, till exempel

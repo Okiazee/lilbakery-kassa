@@ -474,7 +474,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.10.1';
+const APP_VERSION = '1.10.2';
 const APP_DATE = '2026-11-01';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -891,7 +891,7 @@ function preorderFromCart() {
     state.cart = { lines: [], discount: null }; save(); touchBackup(); m.close();
     setCartOpen(false); updateCart(); renderNav();
     if (po) toast(`Beställning B${o.nr} är uppdaterad`);
-    else toast(`Beställning B${o.nr} sparad för ${o.name}`, 'ok', { action: 'Skicka bekräftelse', onAction: () => messageDialog(o, 'bekraftelse') });
+    else toast(`Beställning B${o.nr} sparad för ${o.name}`, 'ok', { action: 'Skicka summering', onAction: () => messageDialog(o, 'bekraftelse') });
   });
   setTimeout(() => { const n = $('#po-name', el); if (n && !n.value) n.focus(); }, 50);
 }
@@ -971,7 +971,7 @@ function orderDialog(id) {
     <div class="ord-section"><h3>Rabatt</h3><select class="input" id="od-discount" ${ro ? 'disabled' : ''}></select></div>
     <div class="ord-total" id="od-total"></div>
     <div class="ord-section"><h3>Betalning</h3>${d.payment === 'betald' ? `<p>Betald${existing && existing.receiptNr ? ` med kvitto #${existing.receiptNr}` : ''}.</p>` : `<div class="seg" id="od-pay"><button class="seg-btn ${d.payment === 'obetald' ? 'is-active' : ''}" data-pay="obetald" ${closed ? 'disabled' : ''}>Betalas i kassan</button><button class="seg-btn ${d.payment === 'faktura' ? 'is-active' : ''}" data-pay="faktura" ${closed ? 'disabled' : ''}>Faktureras</button></div>${existing && !ro && KO.canPay(existing) ? '<button class="btn" data-paid style="margin-top:8px">Bekräfta betalning</button>' : ''}`}</div>
-    <label class="field"><span>Kundens önskemål och allergier</span><textarea class="input" id="od-note" placeholder="Syns i bekräftelsen till kunden">${esc(d.note)}</textarea></label>
+    <label class="field"><span>Kundens önskemål och allergier</span><textarea class="input" id="od-note" placeholder="Syns i summeringen till kunden">${esc(d.note)}</textarea></label>
     <label class="field"><span>Intern anteckning</span><textarea class="input" id="od-internal" placeholder="Syns bara för dig. Länkar blir klickbara.">${esc(d.internalNote)}</textarea></label>
     <div class="note-tools"><button class="btn small" data-add-link>+ Länk</button><div class="note-links" id="od-links"></div></div>
     ${existing && existing.history.length ? `<details class="howto"><summary>Historik</summary><div class="history-list">${existing.history.slice().reverse().map((h) => `<div>${h.ts.slice(0, 10)} ${timeOf(h.ts)} · ${esc(h.text)}</div>`).join('')}</div></details>` : ''}`,
@@ -1073,7 +1073,7 @@ function orderDialog(id) {
     save(); touchBackup(); m.close(); render(); saved = true;
     if (quiet) return;
     if (existing) toast(`Beställning B${d.nr} är sparad`);
-    else toast(`Beställning B${d.nr} är sparad`, 'ok', KO.canConfirm(d) ? { action: 'Skicka bekräftelse', onAction: () => messageDialog(findPo(d.id), 'bekraftelse') } : {});
+    else toast(`Beställning B${d.nr} är sparad`, 'ok', KO.canConfirm(d) ? { action: 'Skicka summering', onAction: () => messageDialog(findPo(d.id), 'bekraftelse') } : {});
   });
   $('[data-cancel]', el)?.addEventListener('click', async () => {
     m.close();
@@ -1139,7 +1139,7 @@ function messageDialog(o, kind = 'bekraftelse') {
   if (!o) return;
   if (kind === 'bekraftelse' && (KO.missingPrices(o) || !o.lines.length)) { toast('Sätt pris på alla varor innan du bekräftar', 'bad', { duration: 6000 }); orderDialog(o.id); return; }
   let cur = kind;
-  const subject = (k) => `${k === 'paminnelse' ? 'Påminnelse om' : 'Bekräftelse av'} beställning B${o.nr} från ${state.settings.foretag}`;
+  const subject = (k) => `${k === 'paminnelse' ? 'Påminnelse om' : 'Summering av'} beställning B${o.nr} från ${state.settings.foretag}`;
   const canShare = !!navigator.share && isTouch();
   const m = openModal({ title: `Meddelande till ${o.name}`, cls: 'wide', body: `
     <div class="seg" id="msg-kind">${Object.keys(KO.TEMPLATE_LABELS).map((k) => `<button class="seg-btn ${k === cur ? 'is-active' : ''}" data-kind="${k}">${KO.TEMPLATE_LABELS[k]}</button>`).join('')}</div>
@@ -1153,7 +1153,7 @@ function messageDialog(o, kind = 'bekraftelse') {
   fill(); makeImg();
   $$('#msg-kind .seg-btn', el).forEach((b) => b.addEventListener('click', () => { cur = b.dataset.kind; $$('#msg-kind .seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); fill(); makeImg(); }));
   $('[data-img]', el).addEventListener('click', async () => {
-    try { if (await deliverFile(await (imgP || confirmationPngBlob(o, cur)), `${cur === 'paminnelse' ? 'paminnelse' : 'bekraftelse'}-B${o.nr}.png`)) markSent(o, cur, 'bild'); }
+    try { if (await deliverFile(await (imgP || confirmationPngBlob(o, cur)), `${cur === 'paminnelse' ? 'paminnelse' : 'bestallning'}-B${o.nr}.png`)) markSent(o, cur, 'bild'); }
     catch (e) { console.error(e); toast('Kunde inte skapa bilden', 'bad'); }
   });
   $('[data-copy]', el).addEventListener('click', async () => { if (await copyText(ta.value, 'Texten är kopierad')) markSent(o, cur, 'kopierad'); });
@@ -2435,7 +2435,7 @@ async function receiptsPdfBlob(list) {
   list.forEach((r, i) => { if (i) doc.addPage([PAGE.w, heights[i]], 'p'); drawReceipt(doc, r, logo, F, true, heights[i]); });
   return doc.output('blob');
 }
-// Orderbekräftelsen i kvittots form. Med D = false mäts bara höjden. pageH = 0 lägger sidfoten direkt efter innehållet.
+// Beställningssummeringen (eller påminnelsen) i kvittots form. Med D = false mäts bara höjden. pageH = 0 lägger sidfoten direkt efter innehållet.
 function drawConfirmation(doc, o, kind, logo, F, D, pageH) {
   const s = state.settings; const W = PAGE.w; const M = PAGE.m; const R = W - M; const CW = W - 2 * M; const T = F.unicode ? pdfText : pdfLatin;
   const font = (bold, size, color) => { doc.setFont(F.body, bold ? 'bold' : 'normal'); doc.setFontSize(size); const c = color || COL.ink; doc.setTextColor(c[0], c[1], c[2]); };
@@ -2449,8 +2449,11 @@ function drawConfirmation(doc, o, kind, logo, F, D, pageH) {
   const logoW = 32; const logoH = logo ? logoW * logo.ratio : 0;
   if (logo) { if (D) doc.addImage(logo.data, 'PNG', M - 1, y - 2, logoW, logoH, 'logo'); }
   else { font(true, 18, COL.brand); text(s.foretag, M, y + 9); }
-  font(true, 24, COL.ink); text(kind === 'paminnelse' ? 'Påminnelse' : 'Bekräftelse', R, y + 11, { align: 'right' });
-  font(false, 10, COL.muted); text(`beställning ${v.nr}`, R, y + 17.5, { align: 'right' });
+  // Rubriken krymps tills den ryms bredvid loggan.
+  const title = kind === 'paminnelse' ? 'Påminnelse' : 'Beställningssummering'; let ts = 24;
+  font(true, ts, COL.ink); while (ts > 14 && doc.getTextWidth(T(title)) > CW - logoW - 6) { ts -= 0.5; font(true, ts, COL.ink); }
+  text(title, R, y + 11, { align: 'right' });
+  font(false, 10, COL.muted); text(kind === 'paminnelse' ? `beställning ${v.nr}` : v.nr, R, y + 17.5, { align: 'right' });
   const pill = o.status === 'avbokad' ? ['AVBOKAD', COL.red] : o.payment === 'betald' ? ['BETALD', COL.brand] : o.payment === 'faktura' ? ['FAKTURERAS', COL.brand] : null;
   if (pill) {
     font(true, 8.5, [255, 255, 255]); const w = doc.getTextWidth(pill[0]) + 6;
@@ -2506,7 +2509,7 @@ function drawConfirmation(doc, o, kind, logo, F, D, pageH) {
     font(false, 9.4, COL.ink); parts.forEach((part, i) => text(part, M + 6, y + 12 + i * 4.6));
     y += h;
   };
-  box('Betalning', v.betalning, COL.mist);
+  if (o.payment !== 'betald') box('Betalning', v.betalning, COL.mist);
   if (o.note) box('Önskemål', o.note, [253, 243, 214]);
   // Hälsning och sidfot
   y += 12; doc.setFont(F.script, F.scriptStyle); doc.setFontSize(F.unicode ? 24 : 14); doc.setTextColor(COL.brand[0], COL.brand[1], COL.brand[2]);
@@ -2566,7 +2569,7 @@ function canvasFonts() {
   }
   return canvasFontsCache;
 }
-// Bekräftelsen eller påminnelsen som PNG, 1184 px bred (8 px per mm), för att skicka i sms eller Instagram.
+// Beställningssummeringen eller påminnelsen som PNG, 1184 px bred (8 px per mm), för att skicka i sms eller Instagram.
 async function confirmationPngBlob(o, kind = 'bekraftelse') {
   const [logo] = await Promise.all([logoForPdf(), canvasFonts()]);
   const images = new Map();
