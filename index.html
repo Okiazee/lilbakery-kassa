@@ -337,6 +337,32 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .mini.move { width: 44px; height: 40px; font-size: 18px; font-weight: 800; color: var(--blue-ink); border-color: var(--line-strong); background: #fff; }
 .order-btn { margin-left: 0; white-space: nowrap; }
 
+.page-seg { max-width: 420px; margin-bottom: 14px; }
+.code-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+.code-card { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1.5px solid var(--line); border-radius: var(--radius-lg); background: #fff; }
+.code-card.is-off { opacity: .62; }
+.code-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.code-big { font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 20px; font-weight: 800; letter-spacing: .06em; color: var(--ink); overflow-wrap: anywhere; }
+.code-value { font-size: 22px; font-weight: 800; color: var(--pink-ink); white-space: nowrap; }
+.code-meta { color: var(--muted); font-size: 14px; font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.code-stats { padding: 8px 10px; border-radius: 10px; background: var(--mist); font-size: 14px; font-weight: 700; color: var(--blue-ink); }
+.code-actions { display: flex; gap: 8px; }
+.code-actions .btn { flex: 1; }
+.badge.cs-aktiv { background: var(--good-bg); color: var(--good); }
+.badge.cs-inaktiv, .badge.cs-utgangen { background: var(--bad-bg); color: var(--bad); }
+.badge.cs-kommande { background: var(--warn-bg); color: var(--warn); }
+.code-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.code-chip { font-family: ui-monospace, 'SF Mono', Consolas, monospace; letter-spacing: .04em; }
+.code-chip small { font-family: var(--font); letter-spacing: 0; color: var(--muted); font-weight: 700; }
+.code-entry { display: flex; gap: 8px; margin-bottom: 6px; }
+.code-entry .btn { white-space: nowrap; flex: none; }
+.code-entry .input { text-transform: uppercase; font-family: ui-monospace, 'SF Mono', Consolas, monospace; letter-spacing: .05em; }
+.or-line { display: flex; align-items: center; gap: 10px; margin: 12px 0; color: var(--muted); font-size: 13px; font-weight: 700; }
+.or-line::before, .or-line::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+.code-applied { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: var(--radius); background: var(--cat-pink); color: var(--pink-ink); font-weight: 800; margin-bottom: 10px; }
+.kv.sub { padding-left: 14px; font-size: 14px; color: var(--muted); }
+.use-table td.num, .use-table th.num { text-align: right; }
+
 /* ---------- Toast ---------- */
 #toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
 .toast { pointer-events: auto; display: flex; gap: 12px; align-items: center; padding: 12px 18px; border-radius: 999px; background: var(--ink); color: #fff; font-weight: 700; box-shadow: var(--shadow); animation: pop .2s ease-out; }
@@ -386,11 +412,13 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
   <div id="toast" aria-live="polite"></div>
   <div id="modal-root"></div>
 </div>
+<script src="rabatt.js"></script>
+<script src="bestallning.js"></script>
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.7.2';
-const APP_DATE = '2026-10-26';
+const APP_VERSION = '1.8.0';
+const APP_DATE = '2026-11-01';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
 const CAT_COLORS = ['butter', 'pink', 'peach', 'blue', 'mint', 'lavender'];
@@ -507,13 +535,13 @@ const OLD_SAMPLE = 'Chocolate chip|Red velvet|Biscoff|Oreo|Salted caramel|Vanilj
 function menuCategories() { return MENU.map((c) => ({ id: c.id, name: c.name, color: c.color, image: { kind: 'icon', icon: c.icon } })); }
 function menuProducts() { return MENU.flatMap((c) => c.items.map(([name, price]) => ({ id: uid(), name, price, vat: 6, categoryId: c.id, emoji: '', active: true }))); }
 function seedState() {
-  return { version: 1, settings: defaultSettings(), categories: menuCategories(), products: menuProducts(), receipts: [], closings: [], cart: { lines: [], discount: null }, nextReceiptNr: 1, preorders: [], nextPreorderNr: 1, meta: { sample: false, menu: MENU_ID, createdAt: new Date().toISOString() } };
+  return { version: 1, settings: defaultSettings(), categories: menuCategories(), products: menuProducts(), receipts: [], closings: [], cart: { lines: [], discount: null }, nextReceiptNr: 1, preorders: [], nextPreorderNr: 1, codes: [], meta: { sample: false, menu: MENU_ID, createdAt: new Date().toISOString() } };
 }
 function migrate(s) {
   s.settings = Object.assign(defaultSettings(), s.settings || {});
   s.categories = s.categories || []; s.products = s.products || []; s.receipts = s.receipts || []; s.closings = s.closings || [];
   s.cart = s.cart || { lines: [], discount: null }; s.nextReceiptNr = s.nextReceiptNr || 1; s.meta = s.meta || {};
-  s.preorders = s.preorders || []; s.nextPreorderNr = s.nextPreorderNr || 1;
+  s.preorders = s.preorders || []; s.nextPreorderNr = s.nextPreorderNr || 1; s.codes = s.codes || [];
   s.categories.forEach((c) => { if (c.image === undefined) { const g = guessIcon(c.name); c.image = g ? { kind: 'icon', icon: g } : null; } });
   // Exempelprodukterna byts mot menyn så länge namn och priser är orörda, även om exempelrutan har dolts.
   const untouched = s.products.map((p) => p.name).join('|') === OLD_SAMPLE && (s.meta.sample || s.products.map((p) => p.price).join('|') === OLD_SAMPLE_PRICES);
@@ -530,7 +558,7 @@ function load() {
 }
 let state = load();
 if (state.meta.menuUpgraded) { delete state.meta.menuUpgraded; save(); setTimeout(() => { toast(state.products.some((x) => x.price == null) ? 'Sortimentet är uppdaterat till pop-up-menyn. Tryck på plattorna och sätt priserna.' : 'Sortimentet är uppdaterat till pop-up-menyn', 'ok', { duration: 9000 }); touchBackup(); }, 800); }
-const ui = { view: 'kassa', cat: 'all', search: '', cartOpen: false, kvittoDay: dayKey(), kvittoAll: false, kvittoSearch: '', closeDay: dayKey(), poSearch: '', poShowAllPaid: false, editOrder: false };
+const ui = { view: 'kassa', cat: 'all', search: '', cartOpen: false, kvittoDay: dayKey(), kvittoAll: false, kvittoSearch: '', closeDay: dayKey(), poSearch: '', poShowAllPaid: false, editOrder: false, prodTab: 'produkter' };
 let installPrompt = null;
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
@@ -547,6 +575,7 @@ function cartTotals(cart = state.cart) {
     let amount = d.type === 'procent' ? Math.round(gross * d.value / 100) : Math.round(d.value);
     amount = Math.max(0, Math.min(amount, gross));
     discount = { type: d.type, value: d.value, amount, reason: d.reason || '' };
+    if (d.codeId) { discount.codeId = d.codeId; discount.code = d.code; }
   }
   const total = r2(gross - (discount ? discount.amount : 0));
   const byRate = new Map();
@@ -859,6 +888,7 @@ function daySummary(day) {
     day, count: ok.length, total, swish, cash,
     vat: [...vat.values()].sort((a, b) => b.rate - a.rate),
     discounts: r2(sum(ok.filter((r) => r.discount), (r) => r.discount.amount)),
+    codes: [...ok.filter((r) => r.discount && r.discount.codeId).reduce((m, r) => { const k = r.discount.codeId; const c = m.get(k) || { code: r.discount.code || '', count: 0, amount: 0 }; c.count += 1; c.amount = r2(c.amount + r.discount.amount); return m.set(k, c); }, new Map()).values()].sort((a, b) => b.amount - a.amount),
     voidedCount: voided.length, voidedSum: r2(sum(voided, (r) => r.total)),
     products: [...prod.values()].sort((a, b) => b.sum - a.sum),
     first: ok.length ? timeOf(ok[0].ts) : '', last: ok.length ? timeOf(ok[ok.length - 1].ts) : ''
@@ -887,6 +917,7 @@ function renderDagsavslut() {
       ${s.vat.length > 1 ? `<tr class="total"><td>Totalt</td><td class="num">${nf.format(sum(s.vat, (v) => v.net))}</td><td class="num">${nf.format(sum(s.vat, (v) => v.vat))}</td><td class="num">${nf.format(s.total)}</td></tr>` : ''}
       </tbody></table></div>
       <div class="kv" style="margin-top:10px"><span>Rabatter givna</span><b>${kr(s.discounts)}</b></div>
+      ${s.codes.map((c) => `<div class="kv sub"><span>varav rabattkod ${esc(c.code)}</span><b>${c.count} st · ${kr(c.amount)}</b></div>`).join('')}
       <div class="kv"><span>Makulerade kvitton</span><b>${s.voidedCount} st · ${kr(s.voidedSum)}</b></div>
       ${(() => { const open = state.preorders.filter((o) => o.status === 'open'); return open.length ? `<div class="kv"><span>Obetalda förbeställningar just nu</span><b>${open.length} st · ${kr(sum(open, poTotal))}</b></div>` : ''; })()}
     </div>
@@ -941,7 +972,7 @@ function closingCsv(day) {
   const rows = [
     [state.settings.foretag, 'Dagsavslut', day], [],
     ['Antal kvitton', s.count], ['Försäljning totalt', csvNum(s.total)], ['Swish', csvNum(s.swish)], ['Kontant', csvNum(s.cash)],
-    ['Rabatter givna', csvNum(s.discounts)], ['Makulerade kvitton', s.voidedCount, csvNum(s.voidedSum)], [],
+    ['Rabatter givna', csvNum(s.discounts)], ...s.codes.map((c) => [`varav rabattkod ${c.code}`, c.count, csvNum(c.amount)]), ['Makulerade kvitton', s.voidedCount, csvNum(s.voidedSum)], [],
     ['Momssats', 'Netto', 'Moms', 'Brutto'], ...s.vat.map((v) => [`${v.rate} %`, csvNum(v.net), csvNum(v.vat), csvNum(v.gross)]), [],
     ['Växelkassa vid start', c ? csvNum(c.float) : ''], ['Kontantförsäljning', csvNum(s.cash)], ['Förväntat i kassan', c ? csvNum(c.expected) : ''],
     ['Räknat', c && c.counted !== null ? csvNum(c.counted) : ''], ['Differens', c && c.diff !== null ? csvNum(c.diff) : ''], ['Anteckning', c ? c.note : ''], [],
@@ -950,8 +981,8 @@ function closingCsv(day) {
   return BOM + rows.map(csvRow).join('\r\n');
 }
 function linesCsv(receipts) {
-  const rows = [['Kvittonr', 'Datum', 'Tid', 'Produkt', 'Antal', 'Pris', 'Summa', 'Moms %', 'Rabatt på kvittot', 'Kvittototal', 'Betalsätt', 'Status']];
-  receipts.slice().sort((a, b) => a.ts.localeCompare(b.ts)).forEach((r) => r.lines.forEach((l) => rows.push([r.nr, r.day, timeOf(r.ts), l.name, l.qty, csvNum(l.price), csvNum(l.price * l.qty), l.vat, r.discount ? csvNum(r.discount.amount) : '0', csvNum(r.total), paymentName(r.payment), r.status === 'ok' ? 'OK' : 'Makulerad'])));
+  const rows = [['Kvittonr', 'Datum', 'Tid', 'Produkt', 'Antal', 'Pris', 'Summa', 'Moms %', 'Rabatt på kvittot', 'Rabattkod', 'Kvittototal', 'Betalsätt', 'Status']];
+  receipts.slice().sort((a, b) => a.ts.localeCompare(b.ts)).forEach((r) => r.lines.forEach((l) => rows.push([r.nr, r.day, timeOf(r.ts), l.name, l.qty, csvNum(l.price), csvNum(l.price * l.qty), l.vat, r.discount ? csvNum(r.discount.amount) : '0', r.discount && r.discount.code ? r.discount.code : '', csvNum(r.total), paymentName(r.payment), r.status === 'ok' ? 'OK' : 'Makulerad'])));
   return BOM + rows.map(csvRow).join('\r\n');
 }
 function productsCsv() {
@@ -962,7 +993,89 @@ function productsCsv() {
 }
 
 // --- Produkter ---
+function prodSeg() { return `<div class="seg page-seg"><button class="seg-btn ${ui.prodTab === 'produkter' ? 'is-active' : ''}" data-action="prod-tab" data-id="produkter">Produkter</button><button class="seg-btn ${ui.prodTab === 'koder' ? 'is-active' : ''}" data-action="prod-tab" data-id="koder">Rabattkoder</button></div>`; }
+function codeCtx() { return { today: dayKey(), receipts: state.receipts, orders: state.preorders }; }
+function codeUsage(c) { return KassaRabatt.usage(c, { receipts: state.receipts, orders: state.preorders }); }
+const shortDate = (iso) => new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short' }).format(new Date(iso));
+function codeValidity(c) {
+  const f = c.validFrom ? shortDate(c.validFrom + 'T12:00:00') : ''; const t = c.validTo ? shortDate(c.validTo + 'T12:00:00') : '';
+  return f && t ? `Gäller ${f}–${t}` : f ? `Gäller från ${f}` : t ? `Gäller till och med ${t}` : 'Gäller tills vidare';
+}
+function codeCard(c) {
+  const st = KassaRabatt.status(c, dayKey()); const u = codeUsage(c);
+  const stats = u.count ? `${u.count} ${u.count === 1 ? 'gång' : 'gånger'} · ${kr(u.amount)} i rabatt · senast ${shortDate(u.last)}` : 'Inte använd ännu';
+  return `<div class="code-card ${st === 'aktiv' ? '' : 'is-off'}">
+    <div class="code-top"><span class="code-big">${esc(c.code)}</span><span class="code-value">${esc(KassaRabatt.describe(c))}</span></div>
+    <div class="code-meta"><span class="badge cs-${st}">${KassaRabatt.STATUS_LABELS[st]}</span>${c.label ? `<span>${esc(c.label)}</span>` : ''}<span>${esc(codeValidity(c))}</span>${c.maxUses ? `<span>Max ${c.maxUses} ${c.maxUses === 1 ? 'gång' : 'gånger'}</span>` : ''}</div>
+    <div class="code-stats">${esc(stats)}${u.reserved ? ` · ${u.reserved} ${u.reserved === 1 ? 'reserverad' : 'reserverade'} i beställningar` : ''}</div>
+    <div class="code-actions"><button class="btn small" data-action="code-copy" data-id="${c.id}">Kopiera</button><button class="btn small" data-action="code-usage" data-id="${c.id}">Användning</button><button class="btn small" data-action="code-edit" data-id="${c.id}">Ändra</button></div>
+  </div>`;
+}
+function renderKoder() {
+  const order = { aktiv: 0, kommande: 1, utgangen: 2, inaktiv: 3 }; const today = dayKey();
+  const list = state.codes.slice().sort((a, b) => (order[KassaRabatt.status(a, today)] - order[KassaRabatt.status(b, today)]) || String(b.created).localeCompare(String(a.created)));
+  return `${prodSeg()}<div class="page-head"><h1>Rabattkoder</h1><div class="toolbar"><button class="btn primary" data-action="code-new">Ny rabattkod</button></div></div>
+  <p class="lead">Koderna används i kassan under Rabatt. Hur ofta en kod använts och hur mycket rabatt den gett räknas fram ur kvittona, så makulerade köp räknas inte.</p>
+  ${list.length ? `<div class="code-list">${list.map(codeCard).join('')}</div>` : '<div class="empty">Inga rabattkoder ännu. Tryck Ny rabattkod för att skapa en, till exempel till en kampanj på Instagram.</div>'}`;
+}
+function codeDialog(id) {
+  const existing = id ? state.codes.find((c) => c.id === id) : null;
+  const c = existing || { code: KassaRabatt.generate({ existing: state.codes }), label: '', type: 'procent', value: '', validFrom: '', validTo: '', maxUses: null, active: true };
+  let type = c.type; const u = existing ? codeUsage(existing) : { count: 0, reserved: 0 };
+  const m = openModal({ title: existing ? `Rabattkod ${existing.code}` : 'Ny rabattkod', body: `
+    <label class="field"><span>Kod</span><div class="code-entry"><input class="input" id="cd-code" value="${esc(c.code)}" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn" data-gen>Slumpa</button></div></label>
+    <label class="field"><span>Beskrivning (valfritt)</span><input class="input" id="cd-label" value="${esc(c.label || '')}" placeholder="t.ex. Instagram, höstkampanj" autocomplete="off"></label>
+    <div class="seg"><button class="seg-btn ${type === 'procent' ? 'is-active' : ''}" data-type="procent">Procent</button><button class="seg-btn ${type === 'kr' ? 'is-active' : ''}" data-type="kr">Kronor</button></div>
+    <label class="field"><span id="cd-value-label">Rabatt i ${type === 'procent' ? 'procent' : 'kronor'}</span><input class="input num" id="cd-value" type="number" inputmode="numeric" min="1" step="1" value="${esc(c.value)}"></label>
+    <div class="field-row">
+      <label class="field"><span>Gäller från (valfritt)</span><input class="input" id="cd-from" type="date" value="${esc(c.validFrom || '')}"></label>
+      <label class="field"><span>Gäller till och med (valfritt)</span><input class="input" id="cd-to" type="date" value="${esc(c.validTo || '')}"></label>
+    </div>
+    <label class="field"><span>Max antal gånger (tomt = obegränsat)</span><input class="input num" id="cd-max" type="number" inputmode="numeric" min="1" step="1" value="${esc(c.maxUses || '')}"></label>
+    <label class="check"><input type="checkbox" id="cd-active" ${c.active ? 'checked' : ''}> Aktiv</label>
+    ${existing && (u.count || u.reserved) ? `<p class="hint">Koden är använd ${u.count} ${u.count === 1 ? 'gång' : 'gånger'}. Gamla kvitton behåller koden och beloppet de fick.</p>` : ''}`,
+    footer: `${existing && !u.count && !u.reserved ? '<button class="btn danger-ghost" data-del>Ta bort</button>' : ''}<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Spara</button>` });
+  const el = m.el;
+  $('[data-gen]', el).addEventListener('click', (e) => { e.preventDefault(); $('#cd-code', el).value = KassaRabatt.generate({ existing: state.codes }); });
+  $$('.seg-btn', el).forEach((b) => b.addEventListener('click', () => { type = b.dataset.type; $$('.seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); $('#cd-value-label', el).textContent = `Rabatt i ${type === 'procent' ? 'procent' : 'kronor'}`; }));
+  $('[data-ok]', el).addEventListener('click', () => {
+    const maxRaw = $('#cd-max', el).value.trim();
+    const input = { code: $('#cd-code', el).value, type, value: parseNum($('#cd-value', el).value), validFrom: $('#cd-from', el).value, validTo: $('#cd-to', el).value, maxUses: maxRaw === '' ? null : parseNum(maxRaw) };
+    const errors = KassaRabatt.check(input, state.codes, existing ? existing.id : null);
+    if (errors.length) { toast(errors[0], 'bad', { duration: 6000 }); return; }
+    const data = { code: KassaRabatt.clean(input.code), label: $('#cd-label', el).value.trim(), type, value: input.value, validFrom: input.validFrom || '', validTo: input.validTo || '', maxUses: input.maxUses ? Math.round(input.maxUses) : null, active: $('#cd-active', el).checked };
+    if (existing) Object.assign(existing, data, { updated: new Date().toISOString() });
+    else state.codes.push({ id: uid(), created: new Date().toISOString(), ...data });
+    save(); touchBackup(); m.close(); render(); toast(`Rabattkoden ${data.code} är sparad`);
+  });
+  $('[data-del]', el)?.addEventListener('click', async () => {
+    m.close();
+    if (!(await confirmDialog({ title: `Ta bort ${existing.code}`, text: 'Koden har aldrig använts och tas bort helt.', ok: 'Ta bort', danger: true }))) return;
+    state.codes = state.codes.filter((x) => x.id !== existing.id); save(); touchBackup(); render(); toast('Rabattkoden är borttagen');
+  });
+}
+function codeUsageDialog(id) {
+  const c = state.codes.find((x) => x.id === id); if (!c) return;
+  const u = codeUsage(c);
+  const reservedOrders = state.preorders.filter((o) => o.discount && o.discount.codeId === c.id && (o.status === 'ny' || o.status === 'bekraftad'));
+  const rows = u.uses.slice().reverse().map((x) => `<tr ${x.kind === 'kvitto' ? `data-receipt="${x.receiptId}" style="cursor:pointer"` : ''}><td>${x.at ? `${x.at.slice(0, 10)} ${timeOf(x.at)}` : ''}</td><td>${x.kind === 'kvitto' ? `Kvitto #${x.receiptNr}${x.orderNr ? ` · beställning B${x.orderNr}` : ''}` : `Beställning B${x.orderNr}, faktureras`}</td><td class="num">${kr(x.amount)}</td></tr>`).join('');
+  const m = openModal({ title: `Användning av ${c.code}`, cls: 'wide', body: `
+    <div class="stats" style="margin-bottom:14px"><div class="stat"><span class="stat-label">Använd</span><span class="stat-value">${u.count} <small>${u.count === 1 ? 'gång' : 'gånger'}</small></span></div><div class="stat swish"><span class="stat-label">Rabatt totalt</span><span class="stat-value">${kr(u.amount)}</span></div><div class="stat cash"><span class="stat-label">Senast</span><span class="stat-value" style="font-size:20px">${u.last ? `${u.last.slice(0, 10)} ${timeOf(u.last)}` : '–'}</span></div></div>
+    ${rows ? `<div class="table-wrap"><table class="table use-table"><thead><tr><th>När</th><th>Var</th><th class="num">Rabatt</th></tr></thead><tbody>${rows}</tbody></table></div><p class="hint">Tryck på en rad för att se kvittot.</p>` : '<p class="muted">Koden har inte använts ännu.</p>'}
+    ${reservedOrders.length ? `<h2 style="margin:16px 0 8px">Reserverad i beställningar</h2><div class="list">${reservedOrders.map((o) => `<div class="kv"><span>B${o.nr} · ${esc(o.name)}</span><b>${o.pickupDate || 'utan datum'}</b></div>`).join('')}</div>` : ''}`,
+    footer: '<button class="btn primary" data-close>Stäng</button>' });
+  $$('[data-receipt]', m.el).forEach((tr) => tr.addEventListener('click', () => { m.close(); showReceipt(tr.dataset.receipt); }));
+}
+async function copyText(text, okMsg) {
+  try { await navigator.clipboard.writeText(text); toast(okMsg); return true; }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+    ta.remove(); toast(ok ? okMsg : 'Kunde inte kopiera. Markera texten och kopiera den manuellt.', ok ? 'ok' : 'bad'); return ok;
+  }
+}
 function renderProdukter() {
+  if (ui.prodTab === 'koder') return renderKoder();
   const banner = state.meta.sample ? `<div class="notice">Det här är exempelprodukter för att visa hur kassan fungerar. Importera din egen lista från Word eller ändra dem här.<button class="btn small" data-action="dismiss-sample">Dölj</button></div>` : '';
   const prodRow = (p) => `<div class="prod-row ${p.active === false ? 'is-off' : ''}"><span class="row-emoji">${esc(p.emoji || '')}</span><button class="prod-main" data-action="edit-product" data-id="${p.id}"><span>${esc(p.name)}${p.active === false ? ' <span class="badge off">Dold</span>' : ''}${p.vat !== state.settings.momsStandard ? ` <span class="badge vat">moms ${p.vat} %</span>` : ''}</span></button><span class="prod-price">${p.price == null ? '<span class="badge off">Pris saknas</span>' : kr(p.price)}</span><span class="mini-btns"><button class="mini" data-action="prod-up" data-id="${p.id}" aria-label="Flytta upp">↑</button><button class="mini" data-action="prod-down" data-id="${p.id}" aria-label="Flytta ner">↓</button></span></div>`;
   const cards = state.categories.map((c, i) => {
@@ -972,7 +1085,7 @@ function renderProdukter() {
       <div class="btn-row" style="margin-top:10px"><button class="btn ghost small" data-action="new-product" data-id="${c.id}">+ Lägg till i ${esc(c.name)}</button></div></div>`;
   }).join('');
   const orphans = state.products.filter((p) => !catOf(p.categoryId));
-  return `<div class="page-head"><h1>Produkter</h1><div class="toolbar"><button class="btn primary" data-action="import">Importera från fil</button><button class="btn" data-action="new-product">Ny produkt</button><button class="btn" data-action="new-category">Ny kategori</button><button class="btn ghost" data-action="export-products">Exportera (CSV)</button></div></div>
+  return `${prodSeg()}<div class="page-head"><h1>Produkter</h1><div class="toolbar"><button class="btn primary" data-action="import">Importera från fil</button><button class="btn" data-action="new-product">Ny produkt</button><button class="btn" data-action="new-category">Ny kategori</button><button class="btn ghost" data-action="export-products">Exportera (CSV)</button></div></div>
   ${banner}${cards}
   ${orphans.length ? `<div class="card cat-card"><div class="cat-head"><h2>Utan kategori</h2></div><div class="list">${orphans.map(prodRow).join('')}</div></div>` : ''}
   ${state.categories.length ? '' : '<div class="empty">Inga kategorier ännu. Skapa en kategori eller importera en produktlista.</div>'}`;
@@ -1418,16 +1531,31 @@ function customLineDialog() {
 function discountDialog() {
   const cur = state.cart.discount; let type = cur ? cur.type : 'procent';
   const quickFor = (t) => (t === 'procent' ? [5, 10, 15, 20, 25, 50].map((v) => `<button class="chip" data-quick="${v}">${v} %</button>`) : [5, 10, 20, 50, 100].map((v) => `<button class="chip" data-quick="${v}">${v} kr</button>`)).join('');
+  const ctx = { today: dayKey(), receipts: state.receipts, orders: state.preorders, excludeOrderId: state.cart.preorderId || null };
+  const usable = state.codes.filter((c) => KassaRabatt.validate(c, ctx).ok).sort((a, b) => String(b.created).localeCompare(String(a.created))).slice(0, 6);
   const m = openModal({ title: 'Rabatt på köpet', cls: 'modal-keypad', body: `
+    ${cur && cur.codeId ? `<div class="code-applied"><span>${esc(cur.reason)} · ${cur.type === 'procent' ? `${cur.value} %` : `${cur.value} kr`}</span></div>` : ''}
+    ${usable.length ? `<div class="code-chips">${usable.map((c) => `<button class="chip code-chip" data-code="${c.id}">${esc(c.code)} <small>${esc(KassaRabatt.describe(c))}</small></button>`).join('')}</div>` : ''}
+    <div class="code-entry"><input class="input" id="di-code" placeholder="Skriv rabattkod" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Rabattkod"><button class="btn" data-code-apply>Använd kod</button></div>
+    <div class="or-line">eller egen rabatt</div>
     <div class="seg"><button class="seg-btn ${type === 'procent' ? 'is-active' : ''}" data-type="procent">Procent</button><button class="seg-btn ${type === 'kr' ? 'is-active' : ''}" data-type="kr">Kronor</button></div>
     <div class="keypad-display"><span class="keypad-label">Rabatt</span><span class="keypad-value" id="di-value">–</span></div>
     <div class="quick-row" id="di-quick">${quickFor(type)}</div>
     <div id="di-pad"></div>
-    <label class="field" style="margin-top:12px"><span>Anledning (valfritt)</span><input class="input" id="di-reason" value="${esc(cur ? cur.reason || '' : '')}" placeholder="t.ex. sista timmen, personal" autocomplete="off"></label>`,
+    <label class="field" style="margin-top:12px"><span>Anledning (valfritt)</span><input class="input" id="di-reason" value="${esc(cur && !cur.codeId ? cur.reason || '' : '')}" placeholder="t.ex. sista timmen, personal" autocomplete="off"></label>`,
     footer: `${cur ? '<button class="btn danger-ghost" data-remove>Ta bort rabatt</button>' : ''}<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Använd</button>` });
   const el = m.el;
   const show = (v) => { $('#di-value', el).textContent = v ? v + (type === 'procent' ? ' %' : ' kr') : '–'; };
-  const pad = mountKeypad($('#di-pad', el), { initial: cur ? String(cur.value) : '', maxLen: 6, onChange: show }); show(pad.get());
+  const pad = mountKeypad($('#di-pad', el), { initial: cur && !cur.codeId ? String(cur.value) : '', maxLen: 6, onChange: show }); show(pad.get());
+  const useCode = (c) => {
+    const v = KassaRabatt.validate(c, ctx); if (!v.ok) { toast(v.message, 'bad', { duration: 7000 }); return; }
+    state.cart.discount = KassaRabatt.toDiscount(c); save(); m.close(); updateCart(); toast(`Rabattkod ${c.code}: ${KassaRabatt.describe(c)}`);
+  };
+  $$('[data-code]', el).forEach((b) => b.addEventListener('click', () => useCode(state.codes.find((c) => c.id === b.dataset.code))));
+  const codeInput = $('#di-code', el);
+  const applyTyped = () => { const c = KassaRabatt.find(state.codes, codeInput.value); if (!c) { toast(codeInput.value.trim() ? `Koden ${KassaRabatt.clean(codeInput.value)} finns inte` : 'Skriv en rabattkod', 'bad'); return; } useCode(c); };
+  $('[data-code-apply]', el).addEventListener('click', applyTyped);
+  codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); applyTyped(); } });
   const bindQuick = () => $$('[data-quick]', el).forEach((b) => b.addEventListener('click', () => pad.set(b.dataset.quick)));
   bindQuick();
   $$('.seg-btn', el).forEach((b) => b.addEventListener('click', () => { type = b.dataset.type; $$('.seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); $('#di-quick', el).innerHTML = quickFor(type); bindQuick(); show(pad.get()); }));
@@ -1943,8 +2071,15 @@ function restore() {
   input.click();
 }
 async function wipe() {
-  if (!(await confirmDialog({ title: 'Radera kvitton', text: `Alla ${state.receipts.length} kvitton och ${state.closings.length} dagsavslut raderas och kvittonumreringen börjar om från 1. Produkter och inställningar behålls. Spara en säkerhetskopia först om du vill kunna ångra dig.`, ok: 'Radera allt', danger: true }))) return;
+  const hasCodes = state.codes.length > 0;
+  const choice = await new Promise((resolve) => {
+    const m = openModal({ title: 'Radera kvitton', body: `<p class="modal-text">Alla ${state.receipts.length} kvitton och ${state.closings.length} dagsavslut raderas och kvittonumreringen börjar om från 1. Produkter och inställningar behålls. Spara en säkerhetskopia först om du vill kunna ångra dig.</p>${hasCodes ? `<p class="modal-text">Statistiken för ${state.codes.length} ${state.codes.length === 1 ? 'rabattkod' : 'rabattkoder'} nollställs också, eftersom den räknas från kvittona.</p><label class="check"><input type="checkbox" id="wipe-codes" checked> Avaktivera rabattkoderna</label>` : ''}`,
+      footer: '<button class="btn ghost" data-close>Avbryt</button><button class="btn danger" data-ok>Radera allt</button>', onClose: (r) => resolve(r || null) });
+    $('[data-ok]', m.el).addEventListener('click', () => m.close({ deactivate: hasCodes && $('#wipe-codes', m.el).checked }));
+  });
+  if (!choice) return;
   if (!(await requirePin('Radering kräver PIN'))) return;
+  if (choice.deactivate) state.codes.forEach((c) => { c.active = false; });
   state.receipts = []; state.closings = []; state.nextReceiptNr = 1; state.cart = { lines: [], discount: null }; state.preorders = state.preorders.filter((o) => o.status === 'open'); save(); toast('Kvitton och dagsavslut raderade'); render();
 }
 async function setPin() {
@@ -2013,6 +2148,11 @@ const actions = {
     catch (e) { console.error(e); toast('Kunde inte skapa PDF', 'bad'); }
     finally { if (el.isConnected) { el.disabled = false; el.textContent = 'Ladda ner PDF'; } }
   },
+  'prod-tab': ({ id }) => { ui.prodTab = id; render(); },
+  'code-new': () => codeDialog(null),
+  'code-edit': ({ id }) => codeDialog(id),
+  'code-usage': ({ id }) => codeUsageDialog(id),
+  'code-copy': ({ id }) => { const c = state.codes.find((x) => x.id === id); if (c) copyText(c.code, `${c.code} är kopierad`); },
   'check-update': ({ el }) => checkForUpdate(el),
   install: async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; render(); }
 };

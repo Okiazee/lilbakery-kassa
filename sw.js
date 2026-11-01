@@ -1,9 +1,9 @@
 /* Service worker för lil'bakery Kassa: appen fungerar offline när den väl laddats en gång. */
-const VERSION = '2026-10-26.1';
+const VERSION = '2026-11-01.1';
 const SHELL = 'kassa-shell-' + VERSION;
 const FONTS = 'kassa-fonts';
 const ASSETS = [
-  './', './index.html', './manifest.webmanifest',
+  './', './index.html', './manifest.webmanifest', './rabatt.js', './bestallning.js',
   './vendor/jszip.min.js', './vendor/qrcode.min.js', './vendor/jspdf.umd.min.js', './vendor/fonts/Nunito-Regular.ttf', './vendor/fonts/Nunito-ExtraBold.ttf', './vendor/fonts/Sacramento-Regular.ttf',
   './img/logo.png', './img/cupcake.png', './img/wordmark.png',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'
