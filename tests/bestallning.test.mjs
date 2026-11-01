@@ -184,6 +184,12 @@ test('calendarEvent: titel, tid, heldag, status och ingen händelse utan datum e
   assert.equal(O.calendarEvent(order({ kind: 'leverans', address: 'Storgatan 1' }), { total: 1 }).plats, 'Storgatan 1');
   assert.equal(O.calendarEvent(order({ status: 'avbokad' }), {}), null);
   assert.equal(O.calendarEvent(order({ pickupDate: '' }), {}), null);
+  // Påminnelse bara med reminder, och null när beställningen är utlämnad.
+  assert.equal('paminnelse' in O.calendarEvent(o, { total: 1 }), false);
+  const rem = { days: 3, time: '14:00' };
+  assert.equal(O.calendarEvent(o, { total: 1, reminder: rem }).paminnelse, '2026-11-05 14:00');
+  assert.equal(O.calendarEvent(order({ pickupDate: '2026-12-02' }), { total: 1, reminder: rem }).paminnelse, '2026-11-29 14:00');
+  assert.equal(O.calendarEvent(order({ status: 'utlamnad', payment: 'betald' }), { total: 1, reminder: rem }).paminnelse, null);
 });
 
 test('calendarChanges: bara ändrade skickas, borttagna och avbokade raderas', () => {

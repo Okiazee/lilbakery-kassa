@@ -208,7 +208,9 @@
 
   // ---------- Google Kalender ----------
   // Händelsen som skickas till skriptet, eller null när beställningen inte ska finnas i kalendern.
-  function calendarEvent(o, { total, missing = 0, formatKr = (n) => `${n} kr` } = {}) {
+  // reminder = { days, time } ger en påminnelse, t.ex. kl. 14:00 tre dagar före (utlämnade får null).
+  // Utan reminder saknas fältet, så att skript före version 5 får samma händelse som förut.
+  function calendarEvent(o, { total, missing = 0, formatKr = (n) => `${n} kr`, reminder } = {}) {
     if (!isYmd(o.pickupDate) || o.status === 'avbokad') return null;
     const pre = o.status === 'utlamnad' ? '✓ ' : '';
     const post = o.status === 'ny' ? ' (ej bekräftad)' : '';
@@ -220,11 +222,13 @@
       o.kind === 'leverans' && o.address ? `Leverans till: ${o.address}` : '',
       o.note ? `Önskemål: ${o.note}` : '', o.internalNote ? `Intern anteckning:\n${plainLinks(o.internalNote)}` : ''
     ].filter(Boolean).join('\n');
-    return {
+    const ev = {
       id: o.id, titel: `${pre}B${o.nr} ${o.name}, ${o.kind === 'leverans' ? 'leverans' : 'hämtning'}${post}`,
       datum: o.pickupDate, tid: isHm(o.pickupTime) ? o.pickupTime : '', minuter: 30,
       beskrivning: desc, plats: o.kind === 'leverans' ? (o.address || '') : ''
     };
+    if (reminder) ev.paminnelse = o.status === 'utlamnad' ? null : `${shift(o.pickupDate, -reminder.days)} ${reminder.time}`;
+    return ev;
   }
   // Kort kontrollsumma (djb2) för att se om en händelse ändrats sedan den skickades.
   function hash(value) { const s = JSON.stringify(value); let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36); }

@@ -177,7 +177,13 @@ interna anteckningen, och flyttas eller tas bort när beställningen ändras.
 Utlämnade beställningar får en bock i titeln och nya en markering
 *(ej bekräftad)*. Beställningar äldre än 60 dagar skickas inte.
 
-Synken går genom samma skript som Google Drive, version 4:
+Varje beställning får en påminnelse kl. 14 tre dagar före. Den syns i Google
+Kalender och i Apples Kalender när Google-kontot är tillagt på enheten.
+Utlämnade beställningar får ingen påminnelse. Med ett skript före version 5
+synkas kalendern utan påminnelser. När skriptet uppdaterats skickas alla
+beställningar igen, med påminnelse.
+
+Synken går genom samma skript som Google Drive, version 5:
 
 1. Kopiera skriptet under *Inställningar → Google Drive* och ersätt koden i
    script.google.com. Spara.

@@ -474,7 +474,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.10.3';
+const APP_VERSION = '1.11.0';
 const APP_DATE = '2026-11-01';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -1757,13 +1757,13 @@ function renderInstallningar() {
             <li>Ändrar du skriptet senare: Distribuera, <b>Hantera distributioner</b>, pennan, Version: <b>Ny version</b>, Distribuera. Adressen förblir densamma.</li>
             <li><b>Mejla kvitton:</b> har du kopplat Drive före version 1.6, ersätt koden i skriptet med den nya nedan, spara, och gör en ny version enligt punkten ovan. Godkänn att skriptet får skicka e-post. Testa anslutningen visar sedan att kvitton kan mejlas.</li>
           </ol>
-          <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV. Skriptet är version 4 och används också av fakturaappen, som sparar sina kopior i undermappen <b>Fakturor</b>. Det lägger även beställningarna i Google Kalender, se kortet nedan.</p>
+          <p class="fine">Kopiorna hamnar i mappen <b>lil'bakery Kassa</b> på din Drive: senaste kopian, en kopia per dag och dagsavsluten som CSV. Skriptet är version 5 och används också av fakturaappen, som sparar sina kopior i undermappen <b>Fakturor</b>. Det lägger även beställningarna i Google Kalender, se kortet nedan.</p>
           <div class="btn-row"><button class="btn" data-action="copy-script">Kopiera skriptet</button></div>
           <pre class="code" id="drive-script">${esc(driveScriptText())}</pre>
         </details>
       </div>
       <div class="card"><h2>Google Kalender</h2>
-        <p class="fine">Beställningar med datum läggs automatiskt i en egen kalender i ditt Google-konto, och flyttas eller tas bort när du ändrar dem i kassan. Din vanliga kalender rörs inte. Kalendern använder samma skript som Google Drive.</p>
+        <p class="fine">Beställningar med datum läggs automatiskt i en egen kalender i ditt Google-konto, och flyttas eller tas bort när du ändrar dem i kassan. Varje beställning får en påminnelse kl. 14 tre dagar före. Din vanliga kalender rörs inte. Kalendern använder samma skript som Google Drive.</p>
         <div id="cal-status" class="status-line ${calStatus().cls}">${esc(calStatus().text)}</div>
         <label class="check"><input type="checkbox" data-setting="calSync" ${s.calSync ? 'checked' : ''}> Synka beställningar till Google Kalender</label>
         ${f('calName', 'Kalenderns namn', { attrs: `spellcheck="false" placeholder="${esc(CAL_DEFAULT)}"` })}
@@ -1771,7 +1771,7 @@ function renderInstallningar() {
         <details class="howto"><summary>Så slår du på kalendern, görs en gång på datorn</summary>
           <ol class="steps">
             <li>Koppla Google Drive enligt kortet ovan, om du inte redan gjort det.</li>
-            <li>Tryck <b>Kopiera skriptet</b> under Google Drive. Öppna ditt projekt på <b>script.google.com</b>, markera all kod, klistra in den nya och spara med Ctrl+S. Det är version 4.</li>
+            <li>Tryck <b>Kopiera skriptet</b> under Google Drive. Öppna ditt projekt på <b>script.google.com</b>, markera all kod, klistra in den nya och spara med Ctrl+S. Det är version 5.</li>
             <li>Välj funktionen <b>godkann</b> i listan i verktygsraden och tryck <b>Kör</b>. Godkänn att skriptet får hantera dina kalendrar: välj kontot, <b>Avancerat</b>, <i>Fortsätt till projektet</i>, <b>Tillåt</b>.</li>
             <li>Distribuera, <b>Hantera distributioner</b>, pennan, Version: <b>Ny version</b>, Distribuera. Adressen förblir densamma.</li>
             <li>Bocka i rutan ovan. Kalendern <b>${esc(CAL_DEFAULT)}</b> skapas och syns i Google Kalender på alla dina enheter. Där kan du ge den en egen färg.</li>
@@ -2037,7 +2037,7 @@ const PREVIEW_MSG = 'Det här är förhandsvisningen på claude.ai, och den får
 function driveConfigured() { return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec\/?$/.test((state.settings.driveUrl || '').trim()); }
 function backupObject() { return { app: 'lilbakery-kassa', version: APP_VERSION, exportedAt: new Date().toISOString(), state }; }
 function driveScriptText() {
-  return `// lil'bakery Kassa och Faktura, version 4: sparar säkerhetskopior på Google Drive, mejlar kvitton och fakturor och lägger beställningar i Google Kalender.
+  return `// lil'bakery Kassa och Faktura, version 5: sparar säkerhetskopior på Google Drive, mejlar kvitton och fakturor och lägger beställningar i Google Kalender med påminnelse.
 const NYCKEL = '${state.settings.driveKey || ''}';   // samma nyckel i kassans och fakturaappens inställningar
 const MAPP = "lil'bakery Kassa";        // mappen skapas i Min enhet på Google Drive
 const FAKTURAMAPP = 'Fakturor';         // undermapp i MAPP för fakturaappens kopior och PDF:er
@@ -2064,7 +2064,7 @@ function doPost(e) {
 }
 function doGet(e) {
   if (!e.parameter || e.parameter.key !== NYCKEL) return svar({ ok: false, error: 'Fel nyckel' });
-  if (e.parameter.action === 'ping') return svar({ ok: true, mail: true, version: 4, faktura: true, kalender: true });
+  if (e.parameter.action === 'ping') return svar({ ok: true, mail: true, version: 5, faktura: true, kalender: true, paminnelse: true });
   const faktura = e.parameter.app === 'faktura';
   const mapp = faktura ? hamtaFakturamapp() : hamtaMapp();
   const filer = mapp.getFilesByName(faktura ? 'faktura-backup-senaste.json' : 'kassa-backup-senaste.json');
@@ -2132,11 +2132,21 @@ function synkaKalender(data) {
         } catch (err) { ev = null; }   // händelsen har tagits bort i kalendern, skapa en ny
       }
       if (!ev) ev = h.tid ? kal.createEvent(h.titel, start, slut, opt) : kal.createAllDayEvent(h.titel, start, opt);
+      if (h.paminnelse !== undefined) paminn(ev, h, start, tz);   // utan fältet rörs påminnelserna inte
       props.setProperty(nyckel(h.id), ev.getId());
       klara.push(h.id);
     } catch (err) { fel.push({ id: h.id, error: String(err) }); }
   });
   return svar({ ok: true, klara: klara, fel: fel, kalender: kal.getName() });
+}
+// En påminnelse vid h.paminnelse ('yyyy-MM-dd HH:mm'), t.ex. kl. 14 tre dagar före. null tar bort påminnelserna.
+function paminn(ev, h, start, tz) {
+  ev.removeAllReminders();
+  if (!h.paminnelse) return;
+  const nar = Utilities.parseDate(h.paminnelse, tz, 'yyyy-MM-dd HH:mm');
+  const fran = h.tid ? start : Utilities.parseDate(h.datum + ' 00:00', tz, 'yyyy-MM-dd HH:mm');   // heldag räknas från midnatt
+  const minuter = Math.round((fran.getTime() - nar.getTime()) / 60000);
+  if (minuter >= 0 && minuter <= 40320) ev.addPopupReminder(minuter);   // Google tillåter högst fyra veckor
 }
 function hamtaKalender(namn) {
   const n = String(namn || '').trim() || KALENDER;
@@ -2221,8 +2231,8 @@ async function driveTest() {
     else if (json.error === 'Fel nyckel') throw new Error('Skriptet svarar men nyckeln stämmer inte. Nyckeln i fältet ovan måste vara exakt samma som NYCKEL i skriptet.');
     else throw new Error(json.error || 'Skriptet svarade med fel');
     drivePingCache = null; let ping = { ok: false }; try { ping = await drivePing(); } catch (e) { ping = { ok: false }; }
-    toast(msg + (ping.mail === true ? ' Kvitton kan mejlas.' : ' För att mejla kvitton behöver skriptet uppdateras, se instruktionen nedan.') + (ping.kalender === true ? ' Kalendern kan synkas.' : state.settings.calSync ? ' För kalendern behöver skriptet uppdateras till version 4.' : ''), 'ok', { duration: 10000 });
-    updateCalStatus();
+    toast(msg + (ping.mail === true ? ' Kvitton kan mejlas.' : ' För att mejla kvitton behöver skriptet uppdateras, se instruktionen nedan.') + (ping.kalender === true ? ' Kalendern kan synkas.' : '') + (state.settings.calSync && ping.paminnelse !== true ? ' För kalendern med påminnelser behöver skriptet uppdateras till version 5.' : ''), 'ok', { duration: 10000 });
+    updateCalStatus(); if (ping.paminnelse === true && !state.meta.calRem) touchCalendar(true);
   } catch (e) { toast('Anslutningen misslyckades: ' + friendlyDriveError(e), 'bad', { duration: 12000 }); }
 }
 async function driveRestore() {
@@ -2244,6 +2254,8 @@ function afterClosingSaved(day) {
 // för det som senast skickats, så att bara ändringar skickas. Äldre än 60 dagar lämnas som de är i kalendern.
 const CAL_DEFAULT = "lil'bakery beställningar";
 const CAL_BATCH = 25; const CAL_DAYS_BACK = 60;
+// Påminnelse i kalendern kl. 14 tre dagar före. Skickas när skriptet är version 5 (state.meta.calRem).
+const CAL_REMINDER = { days: 3, time: '14:00' };
 let calTimer = null; let calBusy = false; let calAgain = false;
 function calName() { return String(state.settings.calName || '').trim() || CAL_DEFAULT; }
 function calOn() { return !!state.settings.calSync && driveConfigured() && !IN_PREVIEW; }
@@ -2253,7 +2265,7 @@ function calPlan() {
   for (const o of state.preorders) {
     if (o.pickupDate && o.pickupDate < from) { old.add(o.id); continue; }
     const t = orderTotals(o);
-    events[o.id] = KO.calendarEvent(o, { total: t.total, missing: t.missing, formatKr: kr });
+    events[o.id] = KO.calendarEvent(o, { total: t.total, missing: t.missing, formatKr: kr, reminder: state.meta.calRem ? CAL_REMINDER : undefined });
   }
   return KO.calendarChanges(events, Object.fromEntries(Object.entries(sent).filter(([id]) => !old.has(id))));
 }
@@ -2278,11 +2290,14 @@ async function calSync(opts = {}) {
   if (!calOn()) { if (opts.toast) toast(IN_PREVIEW ? PREVIEW_MSG : !driveConfigured() ? 'Koppla Google Drive först. Kalendern använder samma skript.' : 'Bocka i Synka beställningar till Google Kalender först.', 'bad', { duration: 9000 }); return false; }
   if (calBusy) { calAgain = true; return false; }
   if (navigator.onLine === false) { if (opts.toast) toast('Ingen uppkoppling. Kalendern uppdateras när nätet är tillbaka.', 'bad'); return false; }
-  const { upserts, deletes } = calPlan();
-  if (!upserts.length && !deletes.length) { if (state.meta.calLastError) { state.meta.calLastError = ''; save(); } updateCalStatus(); if (opts.toast) toast('Kalendern är redan uppdaterad'); return true; }
-  calBusy = true; updateCalStatus();
+  calBusy = true;
   try {
     if (opts.toast) drivePingCache = null;
+    // Första gången skriptet kan påminnelser ändras alla händelser och skickas igen, nu med påminnelse.
+    if (!state.meta.calRem) { const p = await drivePing().catch(() => ({})); if (p.paminnelse === true) { state.meta.calRem = true; save(); } }
+    const { upserts, deletes } = calPlan();
+    if (!upserts.length && !deletes.length) { if (state.meta.calLastError) { state.meta.calLastError = ''; save(); } if (opts.toast) toast('Kalendern är redan uppdaterad'); return true; }
+    updateCalStatus();
     const ping = await drivePing();
     if (!ping.ok) throw new Error(ping.error === 'Fel nyckel' ? 'Nyckeln stämmer inte med skriptet.' : 'Skriptet svarar inte som det ska. Tryck Testa anslutningen under Google Drive.');
     if (ping.kalender !== true) throw new Error('Skriptet i ditt Google-konto är en äldre version utan kalender. Uppdatera det enligt stegen nedan.');

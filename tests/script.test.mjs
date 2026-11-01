@@ -21,12 +21,13 @@ function parseDate(text, tz, fmt) {
 function google(key = 'k') {
   let seq = 0;
   class Ev {
-    constructor(cal, title, start, end, opt, allDay) { this.cal = cal; this.id = `ev${++seq}@google.com`; this.title = title; this.start = start; this.end = end; this.description = opt.description; this.location = opt.location; this.allDay = allDay; this.deleted = false; }
+    constructor(cal, title, start, end, opt, allDay) { this.cal = cal; this.id = `ev${++seq}@google.com`; this.title = title; this.start = start; this.end = end; this.description = opt.description; this.location = opt.location; this.allDay = allDay; this.deleted = false; this.reminders = []; }
     getId() { return this.id; } isAllDayEvent() { return this.allDay; }
     check() { if (this.deleted) throw new Error('Händelsen är borttagen'); }
     setTitle(t) { this.check(); this.title = t; } setDescription(t) { this.check(); this.description = t; } setLocation(t) { this.check(); this.location = t; }
     setTime(s, e) { this.check(); this.start = s; this.end = e; } setAllDayDate(d) { this.check(); this.start = d; this.end = null; }
     deleteEvent() { this.check(); this.deleted = true; }
+    removeAllReminders() { this.check(); this.reminders = []; } addPopupReminder(min) { this.check(); this.reminders.push(min); }
   }
   class Cal {
     constructor(name, id) { this.name = name; this.id = id; this.events = []; }
@@ -58,15 +59,15 @@ function google(key = 'k') {
 }
 const ev = (over = {}) => ({ id: 'o1', titel: 'B7 Ada Exempel, hämtning', datum: '2026-11-14', tid: '10:30', minuter: 30, beskrivning: '2 × Kaffe', plats: '', ...over });
 
-test('skriptet hittas och är version 4 med kalender', () => {
+test('skriptet hittas och är version 5 med kalender och påminnelse', () => {
   assert.ok(m, 'driveScriptText hittades inte');
   const s = scriptText('abc');
-  assert.match(s, /version 4/);
+  assert.match(s, /version 5/);
   assert.match(s, /const NYCKEL = 'abc';/);
   assert.match(s, /const KALENDER = "lil'bakery beställningar";/);
   assert.doesNotMatch(s, /`|\$\{/);
   const g = google('abc');
-  assert.deepEqual(g.get({ action: 'ping' }), { ok: true, mail: true, version: 4, faktura: true, kalender: true });
+  assert.deepEqual(g.get({ action: 'ping' }), { ok: true, mail: true, version: 5, faktura: true, kalender: true, paminnelse: true });
   assert.equal(g.fns.doPost({ postData: { contents: JSON.stringify({ key: 'fel', action: 'kalender', handelser: [ev()] }) } }).error, 'Fel nyckel');
   assert.equal(g.cals.length, 0);
 });
@@ -142,6 +143,27 @@ test('kalender: händelser i olika kalendrar hålls isär', () => {
   g.post({ action: 'kalender', kalender: 'Annan', handelser: [ev()] });
   assert.equal(g.cals[0].live().length, 1);
   assert.equal(g.cals[1].live().length, 1);   // ny händelse i den nya kalendern, den gamla rörs inte
+});
+
+test('kalender: påminnelse kl. 14 tre dagar före, för tid och heldag', () => {
+  const g = google();
+  // 14 nov 10:30, påminnelse 11 nov 14:00: 2 dygn och 20,5 timmar före.
+  g.post({ action: 'kalender', handelser: [ev({ paminnelse: '2026-11-11 14:00' })] });
+  const e = g.cals[0].live()[0];
+  assert.deepEqual(e.reminders, [(2 * 24 + 20.5) * 60]);
+  // Heldag räknas från midnatt: 2 dygn och 10 timmar. Ny händelse eftersom heldag skapas om.
+  g.post({ action: 'kalender', handelser: [ev({ tid: '', paminnelse: '2026-11-11 14:00' })] });
+  assert.deepEqual(g.cals[0].live()[0].reminders, [3480]);
+  // Uppdatering ersätter, null tar bort, utan fältet rörs inget.
+  g.post({ action: 'kalender', handelser: [ev({ tid: '', paminnelse: '2026-11-12 14:00' })] });
+  assert.deepEqual(g.cals[0].live()[0].reminders, [3480 - 1440]);
+  g.post({ action: 'kalender', handelser: [ev({ tid: '', titel: 'Ny' })] });
+  assert.deepEqual(g.cals[0].live()[0].reminders, [3480 - 1440]);
+  g.post({ action: 'kalender', handelser: [ev({ tid: '', paminnelse: null })] });
+  assert.deepEqual(g.cals[0].live()[0].reminders, []);
+  // Påminnelse efter starten eller mer än fyra veckor före läggs inte in.
+  g.post({ action: 'kalender', handelser: [ev({ id: 'o3', paminnelse: '2026-11-14 11:00' }), ev({ id: 'o4', paminnelse: '2026-10-01 14:00' })] });
+  assert.deepEqual(g.cals[0].live().slice(-2).map((x) => x.reminders), [[], []]);
 });
 
 test('godkann rör Drive, e-post och kalender så att Google frågar om lov', () => {
