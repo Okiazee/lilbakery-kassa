@@ -170,7 +170,7 @@
     let betalning;
     if (o.payment === 'betald') betalning = 'Beställningen är betald. Tack!';
     else if (o.payment === 'faktura') betalning = 'Du får en faktura från oss.';
-    else betalning = `Du betalar med Swish eller kontant vid ${when}.` + (ctx.swish ? ` Vill du betala i förväg går det bra att swisha till ${ctx.swish} och märka betalningen ${nr}.` : '');
+    else betalning = `Du betalar med Swish vid ${when}.` + (ctx.swish ? ` Vill du betala i förväg går det bra att swisha till ${ctx.swish} och märka betalningen ${nr}.` : '');
     return {
       namn: String(o.name || '').trim().split(/\s+/)[0] || '', fullnamn: String(o.name || '').trim(), nr, datum, tid, nar, plats,
       artiklar: rows.join('\n'), summa: ctx.total === undefined ? '' : fmt(ctx.total), betalning,

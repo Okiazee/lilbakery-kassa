@@ -155,12 +155,12 @@ kvar med samma nummer, som B1, B2 och så vidare.
 - **Intern anteckning** syns bara för dig. Adresser som `https://…` och `www.…`
   blir klickbara, och *+ Länk* lägger in en länk med egen text, till exempel
   en bild på tårtan.
-- **Swish** och **Kontant** på kortet lägger beställningen i kassan och tar betalt.
+- **Swish** på kortet lägger beställningen i kassan och visar QR-koden.
+  Beställningar betalas bara med Swish, så Kontant syns inte för dem.
   Kvittot märks med beställningen. Makuleras kvittot blir beställningen obetald
   igen.
 - **Bekräfta betalning** är till när pengarna redan kommit, till exempel en
-  Swish i förväg. Välj Swish eller kontant, så skapas kvittot direkt utan att gå
-  via kassan. Har kunden inte hämtat än får kortet knappen *Markera utlämnad*.
+  Swish i förväg. Kvittot skapas direkt utan att gå via kassan. Har kunden inte hämtat än får kortet knappen *Markera utlämnad*.
   En betald beställning kan inte ändras eller avbokas förrän kvittot makulerats.
 
 Beställningarna sparas på enheten, liksom kvittona. Hantera dem på den enhet där

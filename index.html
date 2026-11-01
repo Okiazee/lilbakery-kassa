@@ -474,7 +474,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.10.1';
 const APP_DATE = '2026-11-01';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -745,7 +745,7 @@ function cartInner() {
     <div class="cart-tools"><button class="btn small" data-action="custom">Eget belopp</button><button class="btn small ${t.discount ? 'is-on' : ''}" data-action="discount" ${lines.length ? '' : 'disabled'}>${t.discount ? `Rabatt −${kr(t.discount.amount)}` : 'Rabatt'}</button></div>
     ${t.discount ? `<div class="cart-sub"><span>Summa</span><span>${kr(t.gross)}</span></div><div class="cart-sub"><span>Rabatt${t.discount.type === 'procent' ? ` ${t.discount.value} %` : ''}</span><span>−${kr(t.discount.amount)}</span></div>` : ''}
     <div class="cart-total"><span>Att betala</span><b>${kr(t.total)}</b></div>
-    <div class="pay-row"><button class="btn pay swish" data-action="pay-swish" ${lines.length ? '' : 'disabled'}>Swish</button><button class="btn pay cash" data-action="pay-cash" ${lines.length ? '' : 'disabled'}>Kontant</button></div>
+    <div class="pay-row"><button class="btn pay swish" data-action="pay-swish" ${lines.length ? '' : 'disabled'}>Swish</button>${po ? '' : `<button class="btn pay cash" data-action="pay-cash" ${lines.length ? '' : 'disabled'}>Kontant</button>`}</div>
     <button class="btn full" data-action="preorder" ${lines.length ? '' : 'disabled'}>${po ? `Uppdatera beställning B${po.nr}` : 'Spara som beställning'}</button>
   </div>`;
 }
@@ -804,7 +804,7 @@ function poCard(o) {
   const inCart = state.cart.preorderId === o.id; const lastSent = o.sent.length ? o.sent[o.sent.length - 1] : null;
   let main = ''; let extra = '';
   if (o.status === 'ny') main = KO.canConfirm(o) ? `<button class="btn primary" data-action="po-confirm" data-id="${o.id}">Bekräfta</button>` : `<button class="btn primary" data-action="po-edit" data-id="${o.id}">${o.lines.length ? 'Sätt priser' : 'Lägg till varor'}</button>`;
-  else if (KO.canPay(o)) { main = `<button class="btn pay swish" data-action="po-pay" data-id="${o.id}" data-method="swish">Swish</button><button class="btn pay cash" data-action="po-pay" data-id="${o.id}" data-method="kontant">Kontant</button>`; extra = `<button class="btn" data-action="po-paid" data-id="${o.id}">Bekräfta betalning</button>`; }
+  else if (KO.canPay(o)) { main = `<button class="btn pay swish" data-action="po-pay" data-id="${o.id}">Swish</button>`; extra = `<button class="btn" data-action="po-paid" data-id="${o.id}">Bekräfta betalning</button>`; }
   else if (KO.canDeliverInvoiced(o) || KO.canDeliverPaid(o)) main = `<button class="btn primary" data-action="po-deliver" data-id="${o.id}">Markera utlämnad</button>`;
   else if (KO.isOpen(o)) main = `<button class="btn primary" data-action="po-edit" data-id="${o.id}">Sätt priser</button>`;
   return `<div class="po-card ${isToday ? 'is-today' : ''} ${o.status === 'ny' ? 'is-new' : ''} ${late ? 'is-late' : ''}">
@@ -914,15 +914,13 @@ async function openPreorderInCart(o, then) {
 // Betalning som redan kommit in, t.ex. Swish i förväg. Kvittot skapas direkt, utan att gå via kassan.
 function confirmPaymentDialog(o) {
   if (payBlocked(o)) return;
-  const t = orderTotals(o); const today = dayKey(); let method = 'swish';
+  const t = orderTotals(o); const today = dayKey(); const method = 'swish';
   const m = openModal({ title: `Bekräfta betalning B${o.nr}`, body: `
     <div class="pay-total"><span>${esc(o.name)}</span><b>${kr(t.total)}</b></div>
-    <div class="seg" id="cp-method"><button class="seg-btn is-active" data-m="swish">Swish</button><button class="seg-btn" data-m="kontant">Kontant</button></div>
     <label class="check"><input type="checkbox" id="cp-given" ${o.pickupDate && o.pickupDate <= today ? 'checked' : ''}> Kunden har fått varorna</label>
-    <p class="hint">Ett kvitto skapas och räknas som försäljning idag. Får kunden varorna senare trycker du Markera utlämnad på beställningen.</p>`,
+    <p class="hint">Betalt med Swish. Ett kvitto skapas och räknas som försäljning idag. Får kunden varorna senare trycker du Markera utlämnad på beställningen.</p>`,
     footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Bekräfta betalning</button>` });
   const el = m.el;
-  $$('#cp-method .seg-btn', el).forEach((b) => b.addEventListener('click', () => { method = b.dataset.m; $$('#cp-method .seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); }));
   $('[data-ok]', el).addEventListener('click', () => {
     if (!KO.canPay(o)) { m.close(); return; }
     const given = $('#cp-given', el).checked; const now = new Date();
@@ -2469,7 +2467,7 @@ function drawConfirmation(doc, o, kind, logo, F, D, pageH) {
   [o.phone, o.email, o.kind === 'leverans' && o.address ? `Leverans till ${o.address}` : ''].filter(Boolean).forEach((x) => wrap(x, CW / 2 - 2).forEach((part) => { text(part, M, yl); yl += 4.3; }));
   const kv = (k, val) => { font(false, 8.8, COL.muted); text(k, colR, yr); font(true, 8.8, COL.ink); const parts = wrap(val, R - colR - 18); parts.forEach((part, i) => text(part, R, yr + i * 4.3, { align: 'right' })); yr += 4.3 * parts.length + 0.6; };
   kv(o.kind === 'leverans' ? 'Leverans' : 'Hämtning', v.datum || 'bestäms senare'); if (v.tid) kv('Tid', `kl. ${v.tid}`);
-  kv('Betalning', o.payment === 'betald' ? 'Betald' : o.payment === 'faktura' ? 'Faktura' : 'Swish eller kontant');
+  kv('Betalning', o.payment === 'betald' ? 'Betald' : o.payment === 'faktura' ? 'Faktura' : 'Swish');
   y = Math.max(yl, yr) + 5;
   // Varor
   const cA = M + 3; const cQty = M + 72; const cPrice = M + 94; const cSum = R - 3;
@@ -2778,7 +2776,7 @@ const actions = {
   custom: () => customLineDialog(),
   discount: () => discountDialog(),
   'pay-swish': () => paySwish(),
-  'pay-cash': () => payCash(),
+  'pay-cash': () => { if (!linkedPreorder()) payCash(); },
   'show-receipt': ({ id }) => showReceipt(id),
   'day-prev': () => { ui.closeDay = shiftDay(ui.closeDay, -1); render(); },
   'day-next': () => { ui.closeDay = shiftDay(ui.closeDay, 1); render(); },
@@ -2809,7 +2807,7 @@ const actions = {
   'cal-now': () => { calForce(); calSync({ toast: true }); },
   'copy-script': async () => { try { await navigator.clipboard.writeText(driveScriptText()); toast('Skriptet är kopierat. Klistra in det i script.google.com.'); } catch (e) { toast('Markera texten i rutan och kopiera den manuellt', 'bad'); } },
   preorder: () => preorderFromCart(),
-  'po-pay': ({ id, el }) => { const o = findPo(id); if (o) openPreorderInCart(o, el.dataset.method === 'swish' ? paySwish : payCash); },
+  'po-pay': ({ id }) => { const o = findPo(id); if (o) openPreorderInCart(o, paySwish); },
   'po-edit': ({ id }) => orderDialog(id),
   'po-new': () => orderDialog(null),
   'po-confirm': ({ id }) => messageDialog(findPo(id), 'bekraftelse'),

@@ -147,7 +147,7 @@ test('mallar: bekräftelse och påminnelse utan undefined och utan dubbla tomrad
   assert.doesNotMatch(text, /\n\n\n/);
   assert.equal(O.render('Hej {namn}, {okand}!', { namn: 'Bo' }), 'Hej Bo, {okand}!');
   assert.match(O.templateVars(order({ payment: 'betald' }), {}).betalning, /betald/);
-  assert.match(O.templateVars(order(), {}).betalning, /^Du betalar med Swish eller kontant vid hämtningen\.$/);
+  assert.match(O.templateVars(order(), {}).betalning, /^Du betalar med Swish vid hämtningen\.$/);
 });
 
 test('länkar: [text](adress), bara adresser och www, skiljetecken efter länken hör inte till den', () => {
