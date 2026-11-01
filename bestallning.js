@@ -41,6 +41,8 @@
   const canConfirm = (o) => o.status === 'ny' && o.lines.length > 0 && !missingPrices(o);
   // Fakturerade beställningar lämnas ut utan kvitto.
   const canDeliverInvoiced = (o) => isOpen(o) && o.payment === 'faktura' && o.lines.length > 0 && !missingPrices(o);
+  // Betald i förväg (kvitto finns) men inte hämtad ännu.
+  const canDeliverPaid = (o) => isOpen(o) && o.payment === 'betald';
   function log(o, text, now = new Date()) { o.history.push({ ts: now.toISOString(), text }); return o; }
 
   // ---------- Datum ----------
@@ -213,7 +215,7 @@
     const post = o.status === 'ny' ? ' (ej bekräftad)' : '';
     const desc = [
       o.lines.map((l) => `${l.qty} × ${l.name}`).join('\n'),
-      `Att betala: ${missing ? 'pris saknas' : formatKr(total)} (${PAYMENT_LABELS[o.payment].toLowerCase()})`,
+      o.payment === 'betald' ? `Betalt: ${formatKr(total)}` : `Att betala: ${missing ? 'pris saknas' : formatKr(total)} (${PAYMENT_LABELS[o.payment].toLowerCase()})`,
       `Status: ${STATUS_LABELS[o.status]}`,
       o.phone ? `Telefon: ${o.phone}` : '', o.email ? `E-post: ${o.email}` : '',
       o.kind === 'leverans' && o.address ? `Leverans till: ${o.address}` : '',
@@ -241,7 +243,7 @@
 
   const api = {
     STATUS_LABELS, PAYMENT_LABELS, KIND_LABELS, TEMPLATE_LABELS, DEFAULT_TEMPLATES, PLACEHOLDERS,
-    migrate, isOpen, missingPrices, canPay, canConfirm, canDeliverInvoiced, log,
+    migrate, isOpen, missingPrices, canPay, canConfirm, canDeliverInvoiced, canDeliverPaid, log,
     longDay, shortDay, svTime, dayLabel, sortKey, agenda, monthGrid, addMonth, shift,
     icsEscape, icsFold, eventTimes, ics, googleCalendarUrl, templateVars, render,
     linkParts, links, plainLinks, calendarEvent, hash, calendarChanges

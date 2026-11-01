@@ -39,6 +39,9 @@ test('status: öppna, betalning, bekräftelse och fakturerade', () => {
   assert.equal(O.canConfirm(ny), true);
   assert.equal(O.canPay(order({ payment: 'faktura' })), false);
   assert.equal(O.canDeliverInvoiced(order({ payment: 'faktura' })), true);
+  assert.equal(O.canDeliverPaid(order({ payment: 'betald' })), true);
+  assert.equal(O.canDeliverPaid(order()), false);
+  assert.equal(O.canPay(order({ payment: 'betald' })), false);
   assert.equal(O.canPay(order({ status: 'avbokad' })), false);
   assert.equal(O.canPay(order({ lines: [] })), false);
   O.log(o, 'Bekräftad', new Date('2026-11-01T09:00:00.000Z'));
@@ -177,6 +180,7 @@ test('calendarEvent: titel, tid, heldag, status och ingen händelse utan datum e
   assert.equal(O.calendarEvent(order({ pickupTime: '' }), { total: 1 }).tid, '');
   assert.equal(O.calendarEvent(order({ status: 'ny' }), { total: 1 }).titel, 'B12 Anna Testsson, hämtning (ej bekräftad)');
   assert.equal(O.calendarEvent(order({ status: 'utlamnad', payment: 'betald' }), { total: 1 }).titel, '✓ B12 Anna Testsson, hämtning');
+  assert.match(O.calendarEvent(order({ payment: 'betald' }), { total: 1250, formatKr: (n) => `${n} kr` }).beskrivning, /\nBetalt: 1250 kr\n/);
   assert.equal(O.calendarEvent(order({ kind: 'leverans', address: 'Storgatan 1' }), { total: 1 }).plats, 'Storgatan 1');
   assert.equal(O.calendarEvent(order({ status: 'avbokad' }), {}), null);
   assert.equal(O.calendarEvent(order({ pickupDate: '' }), {}), null);

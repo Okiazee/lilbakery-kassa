@@ -158,6 +158,10 @@ kvar med samma nummer, som B1, B2 och så vidare.
 - **Swish** och **Kontant** på kortet lägger beställningen i kassan och tar betalt.
   Kvittot märks med beställningen. Makuleras kvittot blir beställningen obetald
   igen.
+- **Bekräfta betalning** är till när pengarna redan kommit, till exempel en
+  Swish i förväg. Välj Swish eller kontant, så skapas kvittot direkt utan att gå
+  via kassan. Har kunden inte hämtat än får kortet knappen *Markera utlämnad*.
+  En betald beställning kan inte ändras eller avbokas förrän kvittot makulerats.
 
 Beställningarna sparas på enheten, liksom kvittona. Hantera dem på den enhet där
 du har kassan. *Hämta senaste kopian* ersätter allt på enheten och varnar om

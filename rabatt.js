@@ -59,7 +59,8 @@
     for (const o of orders) {
       if (!o.discount || o.discount.codeId !== code.id) continue;
       if (o.status === 'utlamnad' && !o.receiptId) uses.push({ kind: 'faktura', at: o.deliveredAt || o.updatedAt || o.created, orderId: o.id, orderNr: o.nr, amount: discountAmount(o.lines, o.discount) });
-      else if (o.status === 'ny' || o.status === 'bekraftad') reserved += 1;
+      // Betald i förväg räknas redan via kvittot.
+      else if ((o.status === 'ny' || o.status === 'bekraftad') && !o.receiptId) reserved += 1;
     }
     uses.sort((a, b) => String(a.at).localeCompare(String(b.at)));
     return { count: uses.length, amount: r2(uses.reduce((s, u) => s + u.amount, 0)), last: uses.length ? uses[uses.length - 1].at : null, uses, reserved };

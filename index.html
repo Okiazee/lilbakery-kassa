@@ -474,7 +474,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 <script>
 (() => {
 'use strict';
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 const APP_DATE = '2026-11-01';
 const STORE_KEY = 'lilbakery.kassa.v1';
 const VAT_RATES = [6, 12, 25, 0];
@@ -802,10 +802,10 @@ function poCard(o) {
   const t = orderTotals(o); const today = dayKey(); const when = poWhen(o);
   const isToday = o.pickupDate === today; const late = KO.isOpen(o) && o.pickupDate && o.pickupDate < today;
   const inCart = state.cart.preorderId === o.id; const lastSent = o.sent.length ? o.sent[o.sent.length - 1] : null;
-  let main = '';
+  let main = ''; let extra = '';
   if (o.status === 'ny') main = KO.canConfirm(o) ? `<button class="btn primary" data-action="po-confirm" data-id="${o.id}">Bekräfta</button>` : `<button class="btn primary" data-action="po-edit" data-id="${o.id}">${o.lines.length ? 'Sätt priser' : 'Lägg till varor'}</button>`;
-  else if (KO.canPay(o)) main = `<button class="btn pay swish" data-action="po-pay" data-id="${o.id}" data-method="swish">Swish</button><button class="btn pay cash" data-action="po-pay" data-id="${o.id}" data-method="kontant">Kontant</button>`;
-  else if (KO.canDeliverInvoiced(o)) main = `<button class="btn primary" data-action="po-deliver" data-id="${o.id}">Markera utlämnad</button>`;
+  else if (KO.canPay(o)) { main = `<button class="btn pay swish" data-action="po-pay" data-id="${o.id}" data-method="swish">Swish</button><button class="btn pay cash" data-action="po-pay" data-id="${o.id}" data-method="kontant">Kontant</button>`; extra = `<button class="btn" data-action="po-paid" data-id="${o.id}">Bekräfta betalning</button>`; }
+  else if (KO.canDeliverInvoiced(o) || KO.canDeliverPaid(o)) main = `<button class="btn primary" data-action="po-deliver" data-id="${o.id}">Markera utlämnad</button>`;
   else if (KO.isOpen(o)) main = `<button class="btn primary" data-action="po-edit" data-id="${o.id}">Sätt priser</button>`;
   return `<div class="po-card ${isToday ? 'is-today' : ''} ${o.status === 'ny' ? 'is-new' : ''} ${late ? 'is-late' : ''}">
     <div class="po-top"><span class="po-name">${esc(o.name)}</span><span class="po-total">${t.missing ? '<span class="badge off">Pris saknas</span>' : kr(t.total)}</span></div>
@@ -816,6 +816,7 @@ function poCard(o) {
     ${o.internalNote ? `<div class="po-note po-internal"><b>Intern</b>${linkHtml(o.internalNote)}</div>` : ''}
     ${lastSent ? `<div class="po-sent">${KO.TEMPLATE_LABELS[lastSent.kind] || 'Meddelande'} skickad ${shortDate(lastSent.at)}</div>` : ''}
     ${main ? `<div class="po-actions">${main}</div>` : ''}
+    ${extra ? `<div class="po-actions">${extra}</div>` : ''}
     <div class="po-more"><button class="btn small ghost" data-action="po-msg" data-id="${o.id}">Meddelande</button><button class="btn small ghost" data-action="po-cal" data-id="${o.id}">Kalender</button><button class="btn small ghost" data-action="po-edit" data-id="${o.id}">Öppna</button></div>
   </div>`;
 }
@@ -894,8 +895,13 @@ function preorderFromCart() {
   });
   setTimeout(() => { const n = $('#po-name', el); if (n && !n.value) n.focus(); }, 50);
 }
+function payBlocked(o) {
+  if (KO.canPay(o)) return false;
+  toast(KO.missingPrices(o) ? 'Sätt pris på alla varor först' : o.payment === 'faktura' ? 'Beställningen faktureras och betalas inte i kassan' : !o.lines.length ? 'Beställningen har inga varor' : 'Beställningen kan inte betalas i kassan', 'bad', { duration: 6000 });
+  return true;
+}
 async function openPreorderInCart(o, then) {
-  if (!KO.canPay(o)) { toast(KO.missingPrices(o) ? 'Sätt pris på alla varor först' : o.payment === 'faktura' ? 'Beställningen faktureras och betalas inte i kassan' : !o.lines.length ? 'Beställningen har inga varor' : 'Beställningen kan inte betalas i kassan', 'bad', { duration: 6000 }); return; }
+  if (payBlocked(o)) return;
   if (state.cart.preorderId !== o.id && state.cart.lines.length) {
     if (await confirmDialog({ title: 'Ett köp pågår redan', text: 'Det ligger varor i kassan. Slutför eller töm det köpet först, så kan du hämta beställningen.', ok: 'Gå till kassan', cancel: 'Stäng' })) { ui.view = 'kassa'; render(); }
     return;
@@ -904,6 +910,38 @@ async function openPreorderInCart(o, then) {
   ui.view = 'kassa'; ui.cartOpen = false; render();
   if (window.matchMedia('(max-width: 759px)').matches) setCartOpen(true);
   if (then) then(); else toast(`Beställning B${o.nr} ligger i kassan`);
+}
+// Betalning som redan kommit in, t.ex. Swish i förväg. Kvittot skapas direkt, utan att gå via kassan.
+function confirmPaymentDialog(o) {
+  if (payBlocked(o)) return;
+  const t = orderTotals(o); const today = dayKey(); let method = 'swish';
+  const m = openModal({ title: `Bekräfta betalning B${o.nr}`, body: `
+    <div class="pay-total"><span>${esc(o.name)}</span><b>${kr(t.total)}</b></div>
+    <div class="seg" id="cp-method"><button class="seg-btn is-active" data-m="swish">Swish</button><button class="seg-btn" data-m="kontant">Kontant</button></div>
+    <label class="check"><input type="checkbox" id="cp-given" ${o.pickupDate && o.pickupDate <= today ? 'checked' : ''}> Kunden har fått varorna</label>
+    <p class="hint">Ett kvitto skapas och räknas som försäljning idag. Får kunden varorna senare trycker du Markera utlämnad på beställningen.</p>`,
+    footer: `<button class="btn ghost" data-close>Avbryt</button><button class="btn primary" data-ok>Bekräfta betalning</button>` });
+  const el = m.el;
+  $$('#cp-method .seg-btn', el).forEach((b) => b.addEventListener('click', () => { method = b.dataset.m; $$('#cp-method .seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); }));
+  $('[data-ok]', el).addEventListener('click', () => {
+    if (!KO.canPay(o)) { m.close(); return; }
+    const given = $('#cp-given', el).checked; const now = new Date();
+    const receipt = newReceipt(t, o.lines.map((l) => ({ ...l, price: Number(l.price) })), method, t.total, o, now);
+    Object.assign(o, { status: given ? 'utlamnad' : 'bekraftad', payment: 'betald', paidAt: receipt.ts, updatedAt: receipt.ts, receiptId: receipt.id, receiptNr: receipt.nr });
+    if (given) o.deliveredAt = receipt.ts;
+    KO.log(o, `Betald med ${paymentName(method)}, kvitto #${receipt.nr}${given ? ', utlämnad' : ''}`, now);
+    state.nextReceiptNr += 1; state.receipts.push(receipt);
+    const inCart = state.cart.preorderId === o.id; if (inCart) state.cart = { lines: [], discount: null };
+    save(); touchBackup(); m.close(); render(); if (inCart) updateCart();
+    toast(`B${o.nr} är betald, kvitto #${receipt.nr}`, 'ok', { action: 'Visa kvitto', onAction: () => showReceipt(receipt.id) });
+  });
+}
+async function deliverOrder(o) {
+  const paid = o.payment === 'betald';
+  const text = paid ? `Beställningen för <b>${esc(o.name)}</b> är betald${o.receiptNr ? ` med kvitto #${o.receiptNr}` : ''} och markeras som utlämnad.` : `Beställningen för <b>${esc(o.name)}</b> markeras som utlämnad. Den faktureras, så inget kvitto skapas i kassan. Skapa fakturan i fakturaappen.`;
+  if (!(await confirmDialog({ title: `Lämna ut B${o.nr}`, text, ok: 'Markera utlämnad' }))) return;
+  o.status = 'utlamnad'; o.deliveredAt = new Date().toISOString(); o.updatedAt = o.deliveredAt; KO.log(o, paid ? 'Utlämnad' : 'Utlämnad, faktureras');
+  save(); touchBackup(); render(); toast(paid ? `B${o.nr} är utlämnad` : `B${o.nr} är utlämnad. Kom ihåg fakturan.`);
 }
 function productPicker(onPick) {
   const items = state.products.filter((p) => p.active !== false).sort((a, b) => catIndex(a.categoryId) - catIndex(b.categoryId));
@@ -916,7 +954,8 @@ function productPicker(onPick) {
 function orderDialog(id) {
   const existing = id ? findPo(id) : null; if (id && !existing) return;
   const d = existing ? JSON.parse(JSON.stringify(existing)) : KO.migrate({ id: uid(), nr: null, status: 'ny', payment: 'obetald', created: new Date().toISOString(), lines: [] });
-  const locked = !!existing && state.cart.preorderId === existing.id; const closed = !!existing && !KO.isOpen(existing); const ro = locked || closed;
+  const locked = !!existing && state.cart.preorderId === existing.id; const closed = !!existing && !KO.isOpen(existing);
+  const paid = !!existing && existing.payment === 'betald'; const ro = locked || closed || paid;
   const m = openModal({ title: existing ? `Beställning B${existing.nr}` : 'Ny beställning', cls: 'wide', body: `
     ${existing ? `<div class="po-meta" style="margin-bottom:10px"><span class="badge st-${d.status}">${KO.STATUS_LABELS[d.status]}</span><span class="badge pay-${d.payment}">${KO.PAYMENT_LABELS[d.payment]}</span>${existing.receiptNr ? `<button class="btn ghost small" data-receipt>Kvitto #${existing.receiptNr}</button>` : ''}</div>` : ''}
     <div class="field-row">
@@ -930,15 +969,15 @@ function orderDialog(id) {
     </div>
     <div class="seg" id="od-kind"><button class="seg-btn ${d.kind === 'hamtning' ? 'is-active' : ''}" data-kind="hamtning">Hämtning</button><button class="seg-btn ${d.kind === 'leverans' ? 'is-active' : ''}" data-kind="leverans">Leverans</button></div>
     <label class="field ${d.kind === 'leverans' ? '' : 'hidden'}" id="od-address-wrap"><span>Leveransadress</span><input class="input" id="od-address" value="${esc(d.address)}" autocomplete="off"></label>
-    <div class="ord-section"><h3>Varor</h3>${locked ? '<p class="notice">Beställningen ligger i kassan. Slutför köpet eller töm kassan för att ändra varorna här.</p>' : ''}<div class="ord-lines" id="od-lines"></div>${ro ? '' : '<div class="btn-row" style="margin-top:8px"><button class="btn small" data-add-product>+ Produkt</button><button class="btn small" data-add-custom>+ Egen rad</button></div>'}</div>
+    <div class="ord-section"><h3>Varor</h3>${locked ? '<p class="notice">Beställningen ligger i kassan. Slutför köpet eller töm kassan för att ändra varorna här.</p>' : ''}${paid && !closed ? `<p class="notice">Beställningen är betald${existing.receiptNr ? ` med kvitto #${existing.receiptNr}` : ''}, så varorna kan inte ändras. Blev något fel? Makulera kvittot, så blir beställningen obetald igen.</p>` : ''}<div class="ord-lines" id="od-lines"></div>${ro ? '' : '<div class="btn-row" style="margin-top:8px"><button class="btn small" data-add-product>+ Produkt</button><button class="btn small" data-add-custom>+ Egen rad</button></div>'}</div>
     <div class="ord-section"><h3>Rabatt</h3><select class="input" id="od-discount" ${ro ? 'disabled' : ''}></select></div>
     <div class="ord-total" id="od-total"></div>
-    <div class="ord-section"><h3>Betalning</h3>${d.payment === 'betald' ? `<p>Betald${existing && existing.receiptNr ? ` med kvitto #${existing.receiptNr}` : ''}.</p>` : `<div class="seg" id="od-pay"><button class="seg-btn ${d.payment === 'obetald' ? 'is-active' : ''}" data-pay="obetald" ${closed ? 'disabled' : ''}>Betalas i kassan</button><button class="seg-btn ${d.payment === 'faktura' ? 'is-active' : ''}" data-pay="faktura" ${closed ? 'disabled' : ''}>Faktureras</button></div>`}</div>
+    <div class="ord-section"><h3>Betalning</h3>${d.payment === 'betald' ? `<p>Betald${existing && existing.receiptNr ? ` med kvitto #${existing.receiptNr}` : ''}.</p>` : `<div class="seg" id="od-pay"><button class="seg-btn ${d.payment === 'obetald' ? 'is-active' : ''}" data-pay="obetald" ${closed ? 'disabled' : ''}>Betalas i kassan</button><button class="seg-btn ${d.payment === 'faktura' ? 'is-active' : ''}" data-pay="faktura" ${closed ? 'disabled' : ''}>Faktureras</button></div>${existing && !ro && KO.canPay(existing) ? '<button class="btn" data-paid style="margin-top:8px">Bekräfta betalning</button>' : ''}`}</div>
     <label class="field"><span>Kundens önskemål och allergier</span><textarea class="input" id="od-note" placeholder="Syns i bekräftelsen till kunden">${esc(d.note)}</textarea></label>
     <label class="field"><span>Intern anteckning</span><textarea class="input" id="od-internal" placeholder="Syns bara för dig. Länkar blir klickbara.">${esc(d.internalNote)}</textarea></label>
     <div class="note-tools"><button class="btn small" data-add-link>+ Länk</button><div class="note-links" id="od-links"></div></div>
     ${existing && existing.history.length ? `<details class="howto"><summary>Historik</summary><div class="history-list">${existing.history.slice().reverse().map((h) => `<div>${h.ts.slice(0, 10)} ${timeOf(h.ts)} · ${esc(h.text)}</div>`).join('')}</div></details>` : ''}`,
-    footer: `${existing && KO.isOpen(existing) ? '<button class="btn danger-ghost" data-cancel>Avboka</button>' : ''}${existing && existing.status === 'avbokad' ? '<button class="btn" data-reopen>Återöppna</button>' : ''}${existing && !existing.receiptId && (existing.status === 'ny' || existing.status === 'avbokad') ? '<button class="btn danger-ghost" data-del>Ta bort</button>' : ''}<button class="btn ghost" data-close>Avbryt</button>${closed ? '' : `<button class="btn primary" data-ok>${existing ? 'Spara' : 'Spara beställning'}</button>`}` });
+    footer: `${existing && KO.isOpen(existing) && !paid ? '<button class="btn danger-ghost" data-cancel>Avboka</button>' : ''}${existing && existing.status === 'avbokad' ? '<button class="btn" data-reopen>Återöppna</button>' : ''}${existing && !existing.receiptId && (existing.status === 'ny' || existing.status === 'avbokad') ? '<button class="btn danger-ghost" data-del>Ta bort</button>' : ''}<button class="btn ghost" data-close>Avbryt</button>${closed ? '' : `<button class="btn primary" data-ok>${existing ? 'Spara' : 'Spara beställning'}</button>`}` });
   const el = m.el; const linesEl = $('#od-lines', el); const totalEl = $('#od-total', el); const discEl = $('#od-discount', el);
   const updateTotal = () => {
     const t = orderTotals(d);
@@ -1013,6 +1052,9 @@ function orderDialog(id) {
   $$('#od-kind .seg-btn', el).forEach((b) => b.addEventListener('click', () => { d.kind = b.dataset.kind; $$('#od-kind .seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); $('#od-address-wrap', el).classList.toggle('hidden', d.kind !== 'leverans'); }));
   $$('#od-pay .seg-btn', el).forEach((b) => b.addEventListener('click', () => { d.payment = b.dataset.pay; $$('#od-pay .seg-btn', el).forEach((x) => x.classList.toggle('is-active', x === b)); }));
   $('[data-receipt]', el)?.addEventListener('click', () => { if (state.receipts.some((r) => r.id === existing.receiptId)) { m.close(); showReceipt(existing.receiptId); } else toast('Kvittot finns inte längre', 'bad'); });
+  // Bekräfta betalning sparar först det som ändrats i rutan.
+  let saved = false; let quiet = false;
+  $('[data-paid]', el)?.addEventListener('click', () => { quiet = true; $('[data-ok]', el).click(); quiet = false; if (saved) confirmPaymentDialog(findPo(existing.id)); });
   $('[data-ok]', el)?.addEventListener('click', () => {
     const f = { name: $('#od-name', el).value.trim(), phone: $('#od-phone', el).value.trim(), email: $('#od-email', el).value.trim(), pickupDate: $('#od-date', el).value, pickupTime: $('#od-time', el).value, address: $('#od-address', el).value.trim(), note: $('#od-note', el).value.trim(), internalNote: $('#od-internal', el).value.trim() };
     if (!f.name) { toast('Skriv kundens namn', 'bad'); $('#od-name', el).focus(); return; }
@@ -1030,7 +1072,8 @@ function orderDialog(id) {
       Object.assign(d, f, { nr: state.nextPreorderNr, created: now }); state.nextPreorderNr += 1;
       KO.log(d, 'Skapad'); state.preorders.push(d);
     }
-    save(); touchBackup(); m.close(); render();
+    save(); touchBackup(); m.close(); render(); saved = true;
+    if (quiet) return;
     if (existing) toast(`Beställning B${d.nr} är sparad`);
     else toast(`Beställning B${d.nr} är sparad`, 'ok', KO.canConfirm(d) ? { action: 'Skicka bekräftelse', onAction: () => messageDialog(findPo(d.id), 'bekraftelse') } : {});
   });
@@ -1073,11 +1116,6 @@ function linkDialog() {
     [urlEl, textEl].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ok(); } }));
     setTimeout(() => urlEl.focus(), 50);
   });
-}
-async function deliverInvoiced(o) {
-  if (!(await confirmDialog({ title: `Lämna ut B${o.nr}`, text: `Beställningen för <b>${esc(o.name)}</b> markeras som utlämnad. Den faktureras, så inget kvitto skapas i kassan. Skapa fakturan i fakturaappen.`, ok: 'Markera utlämnad' }))) return;
-  o.status = 'utlamnad'; o.deliveredAt = new Date().toISOString(); o.updatedAt = o.deliveredAt; KO.log(o, 'Utlämnad, faktureras');
-  save(); touchBackup(); render(); toast(`B${o.nr} är utlämnad. Kom ihåg fakturan.`);
 }
 // ---------- Meddelanden och kalender ----------
 function orderMessage(o, kind) {
@@ -1384,7 +1422,7 @@ function codeDialog(id) {
 function codeUsageDialog(id) {
   const c = state.codes.find((x) => x.id === id); if (!c) return;
   const u = codeUsage(c);
-  const reservedOrders = state.preorders.filter((o) => o.discount && o.discount.codeId === c.id && (o.status === 'ny' || o.status === 'bekraftad'));
+  const reservedOrders = state.preorders.filter((o) => o.discount && o.discount.codeId === c.id && (o.status === 'ny' || o.status === 'bekraftad') && !o.receiptId);
   const rows = u.uses.slice().reverse().map((x) => `<tr ${x.kind === 'kvitto' ? `data-receipt="${x.receiptId}" style="cursor:pointer"` : ''}><td>${x.at ? `${x.at.slice(0, 10)} ${timeOf(x.at)}` : ''}</td><td>${x.kind === 'kvitto' ? `Kvitto #${x.receiptNr}${x.orderNr ? ` · beställning B${x.orderNr}` : ''}` : `Beställning B${x.orderNr}, faktureras`}</td><td class="num">${kr(x.amount)}</td></tr>`).join('');
   const m = openModal({ title: `Användning av ${c.code}`, cls: 'wide', body: `
     <div class="stats" style="margin-bottom:14px"><div class="stat"><span class="stat-label">Använd</span><span class="stat-value">${u.count} <small>${u.count === 1 ? 'gång' : 'gånger'}</small></span></div><div class="stat swish"><span class="stat-label">Rabatt totalt</span><span class="stat-value">${kr(u.amount)}</span></div><div class="stat cash"><span class="stat-label">Senast</span><span class="stat-value" style="font-size:20px">${u.last ? `${u.last.slice(0, 10)} ${timeOf(u.last)}` : '–'}</span></div></div>
@@ -1956,9 +1994,12 @@ function paySwish() {
   if (number) swishQrSvg(number, t.total, `${s.foretag} kvitto ${state.nextReceiptNr}`).then((svg) => { const box = $('#swish-qr', m.el); if (box) box.innerHTML = svg; })
     .catch(() => { const box = $('#swish-qr', m.el); if (box) box.innerHTML = '<p class="hint">QR-koden kunde inte skapas. Kunden kan swisha till numret nedan.</p>'; });
 }
+function newReceipt(t, lines, payment, received, po, now) {
+  return { id: uid(), nr: state.nextReceiptNr, ts: now.toISOString(), day: dayKey(now), lines: lines.map((l) => ({ ...l })), discount: t.discount, gross: t.gross, total: t.total, vatLines: t.vatLines, payment, received: payment === 'kontant' ? r2(received) : t.total, change: payment === 'kontant' ? r2(received - t.total) : 0, status: 'ok', voided: null, preorder: po ? { id: po.id, nr: po.nr, name: po.name } : null };
+}
 function finalizeSale(payment, received) {
   const t = cartTotals(); const now = new Date(); const po = linkedPreorder();
-  const receipt = { id: uid(), nr: state.nextReceiptNr, ts: now.toISOString(), day: dayKey(now), lines: state.cart.lines.map((l) => ({ ...l })), discount: t.discount, gross: t.gross, total: t.total, vatLines: t.vatLines, payment, received: payment === 'kontant' ? r2(received) : t.total, change: payment === 'kontant' ? r2(received - t.total) : 0, status: 'ok', voided: null, preorder: po ? { id: po.id, nr: po.nr, name: po.name } : null };
+  const receipt = newReceipt(t, state.cart.lines, payment, received, po, now);
   if (po) { Object.assign(po, { status: 'utlamnad', payment: 'betald', paidAt: receipt.ts, deliveredAt: receipt.ts, updatedAt: receipt.ts, receiptId: receipt.id, receiptNr: receipt.nr }); KassaOrder.log(po, `Betald med ${paymentName(payment)}, kvitto #${receipt.nr}`, now); }
   state.nextReceiptNr += 1; state.receipts.push(receipt); state.cart = { lines: [], discount: null }; save(); touchBackup();
   setCartOpen(false); updateCart(); renderNav(); showDone(receipt);
@@ -2774,7 +2815,8 @@ const actions = {
   'po-confirm': ({ id }) => messageDialog(findPo(id), 'bekraftelse'),
   'po-msg': ({ id }) => { const o = findPo(id); if (o) messageDialog(o, o.status === 'ny' ? 'bekraftelse' : 'paminnelse'); },
   'po-cal': ({ id }) => calendarDialog(findPo(id)),
-  'po-deliver': ({ id }) => { const o = findPo(id); if (o) deliverInvoiced(o); },
+  'po-deliver': ({ id }) => { const o = findPo(id); if (o) deliverOrder(o); },
+  'po-paid': ({ id }) => { const o = findPo(id); if (o) confirmPaymentDialog(o); },
   'po-filter': ({ id }) => { ui.poFilter = id; ui.poPrevFilter = null; rerenderKeepScroll(); },
   'po-cal-toggle': () => { ui.poCal = !ui.poCal; if (!ui.poCal && ui.poDay) { ui.poDay = null; if (ui.poPrevFilter) { ui.poFilter = ui.poPrevFilter; ui.poPrevFilter = null; } } rerenderKeepScroll(); },
   'po-month': ({ el }) => { const t = dayKey(); const cur = ui.poMonth || { year: Number(t.slice(0, 4)), month: Number(t.slice(5, 7)) }; ui.poMonth = KassaOrder.addMonth(cur.year, cur.month, Number(el.dataset.dir)); rerenderKeepScroll(); },

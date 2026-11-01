@@ -59,7 +59,8 @@ test('usage: kvitton med koden, makulerade räknas inte, fakturerade utlämnade 
     order({ id: 'o2', status: 'ny' }),
     order({ id: 'o3', status: 'avbokad' }),
     order({ id: 'o4', status: 'utlamnad', payment: 'faktura', deliveredAt: '2026-10-20T09:00:00.000Z' }),
-    order({ id: 'o5', status: 'utlamnad', payment: 'betald', receiptId: 'r1' })   // räknas redan via kvittot
+    order({ id: 'o5', status: 'utlamnad', payment: 'betald', receiptId: 'r1' }),  // räknas redan via kvittot
+    order({ id: 'o6', status: 'bekraftad', payment: 'betald', receiptId: 'r2' })  // betald i förväg, inte reserverad
   ];
   const u = R.usage(c, { receipts, orders });
   assert.equal(u.count, 3);
